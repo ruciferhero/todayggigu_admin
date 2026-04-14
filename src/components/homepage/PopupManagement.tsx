@@ -223,8 +223,8 @@ export default function PopupManagement() {
       </div>
 
       <div className="border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+        <table className="app-table">
+          <thead>
             <tr>
               <th className="text-left px-4 py-3 font-medium w-16">No</th>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.popup.title")}</th>
@@ -241,7 +241,7 @@ export default function PopupManagement() {
               <tr><td colSpan={8} className="text-center py-8 text-gray-400">{t("homepage.common.noData")}</td></tr>
             ) : (
               popups.map((popup, index) => (
-                <tr key={popup.id} className="border-b hover:bg-gray-50">
+                <tr key={popup.id}>
                   <td className="px-4 py-3">{index + 1}</td>
                   <td className="px-4 py-3">{popup.title}</td>
                   <td className="px-4 py-3">{popup.coordinates}</td>

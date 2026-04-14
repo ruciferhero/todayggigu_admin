@@ -62,10 +62,10 @@ const MembershipLevels: React.FC = () => {
             <Plus className="w-4 h-4" />{t("settings.membershipLevel.register")}
           </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="app-table-wrap">
+          <table className="app-table">
             <thead>
-              <tr className="bg-gray-50 border-b">
+              <tr>
                 <th className="px-4 py-3 text-center font-medium text-gray-700">{t("settings.membershipLevel.gradeNumber")}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">{t("settings.membershipLevel.gradeName")}</th>
                 <th className="px-4 py-3 text-center font-medium text-gray-700">{t("settings.membershipLevel.numberOfDeliveries")}</th>
@@ -80,7 +80,7 @@ const MembershipLevels: React.FC = () => {
             </thead>
             <tbody>
               {sampleData.map((record) => (
-                <tr key={record.id} className="border-b hover:bg-gray-50">
+                <tr key={record.id}>
                   <td className="px-4 py-3 text-center">{record.gradeNumber}</td>
                   <td className="px-4 py-3">{record.gradeName}</td>
                   <td className="px-4 py-3 text-center">{record.numberOfDeliveries}</td>

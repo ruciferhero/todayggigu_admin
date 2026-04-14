@@ -60,40 +60,59 @@ export default function ShippingAgencyOrders() {
     },
   ];
 
-  const orders: OrderBoardOrder[] = [
-    {
-      orderNo: "SA-250411-401", statusCode: "WH_IN_DONE", center: "Weihai", applicationType: t("orders.status.shippingAgency"), customsClearance: "General",
-      typeLabel: t("orders.status.shippingAgency"), shippingMethod: t("orders.filter.shippingMethodSea"), isShipped: false, memberBadge: t("orders.status.shippingAgency"),
-      userName: "Harbor Market", receiver: "Yeji Lim", trackingCount: 5, warehousedCount: 5, qty: 20, totalAmount: 680000, paidAmount: 680000, weight: 12.4,
-      krTrack: "", shipDate: "2026-04-10", rack: "SA-02-05",
-      warehouseStatus: t("orders.status.warehouseInComplete"), progressStatus: t("orders.status.warehouseInComplete"),
-      createdAt: "2026-04-08 14:20", updatedAt: "2026-04-11 09:15", inquiryResponder: "Harper", buyer: "Lucas",
-      adminMemo: "All items received and inspected.",
-      productMemo: "Fabric items - check for moisture.", caution: "", userMemo: "Consolidate with next batch.",
-      products: [
-        { id: "SA-401-1", productNo: "SP-60101", name: "Home Fabric Set", option: "Mixed / 12 pcs", trackingNo: "CN2026040814001", orderNo: "SA-250411-401", unitPrice: 18000, quantity: 12, totalPrice: 216000, shippingCost: 12000, rackNo: "SA-02-05", prevRackNo: "", statusLabel: t("orders.status.warehouseInComplete") },
-        { id: "SA-401-2", productNo: "SP-60102", name: "Cotton Towel Bundle", option: "White / 8 pcs", trackingNo: "CN2026040814002", orderNo: "SA-250411-401", unitPrice: 14500, quantity: 8, totalPrice: 116000, shippingCost: 8000, rackNo: "SA-02-05", prevRackNo: "SA-02-04", statusLabel: t("orders.status.warehouseInComplete") },
-      ],
-    },
-    {
-      orderNo: "SA-250411-402", statusCode: "WH_SHIPPED", center: "Qingdao", applicationType: t("orders.status.shippingAgency"), customsClearance: "Express",
-      typeLabel: t("orders.status.shippingAgency"), shippingMethod: t("orders.filter.shippingMethodAir"), isShipped: true, memberBadge: t("orders.status.shippingAgency"),
-      userName: "River Goods", receiver: "Sunwoo Bae", trackingCount: 9, warehousedCount: 9, qty: 31, totalAmount: 1194000, paidAmount: 1289000, weight: 15.3,
-      krTrack: "KR5502998712", shipDate: "2026-04-10", rack: "SA-04-07",
-      warehouseStatus: t("orders.status.shipmentComplete"), progressStatus: t("orders.status.shipmentComplete"),
-      createdAt: "2026-04-07 17:06", updatedAt: "2026-04-10 19:22", inquiryResponder: "Evelyn", buyer: "Benjamin",
-      adminMemo: "Dispatched via air cargo.",
-      productMemo: "Outer carton reinforcement done.", caution: "", userMemo: "Print individual labels.",
-      products: [
-        { id: "SA-402-1", productNo: "SP-60201", name: "Storage Basket", option: "Natural / Large", trackingNo: "CN2026040717001", orderNo: "SA-250411-402", unitPrice: 21000, quantity: 15, totalPrice: 315000, shippingCost: 15000, rackNo: "SA-04-07", prevRackNo: "", statusLabel: t("orders.status.shipmentComplete") },
-        { id: "SA-402-2", productNo: "SP-60202", name: "Table Runner", option: "Gray / 180cm", trackingNo: "CN2026040717002", orderNo: "SA-250411-402", unitPrice: 14500, quantity: 16, totalPrice: 232000, shippingCost: 8000, rackNo: "SA-04-07", prevRackNo: "SA-04-06", statusLabel: t("orders.status.shipmentComplete") },
-      ],
-    },
-  ];
+  const allStatusItems = statusGroups.flatMap((group) => group.items);
+  const centers = ["Weihai", "Qingdao", "Guangzhou"];
+
+  const orders: OrderBoardOrder[] = allStatusItems.flatMap((item, statusIndex) => {
+    const targetCount = 3 + (statusIndex % 4); // 3~6
+    return Array.from({ length: targetCount }, (_, itemIndex) => {
+      const seed = statusIndex * 10 + itemIndex + 1;
+      const orderNo = `SA-2604-${String(statusIndex + 1).padStart(2, "0")}${String(itemIndex + 1).padStart(2, "0")}`;
+      const qty = 5 + (seed % 8);
+      const unitPrice = 16000 + (seed % 6) * 3000;
+      const totalAmount = qty * unitPrice;
+      return {
+        orderNo,
+        statusCode: item.code,
+        center: centers[seed % centers.length],
+        applicationType: t("orders.status.shippingAgency"),
+        customsClearance: seed % 2 === 0 ? "General" : "Express",
+        typeLabel: t("orders.status.shippingAgency"),
+        shippingMethod: seed % 2 === 0 ? t("orders.filter.shippingMethodSea") : t("orders.filter.shippingMethodAir"),
+        isShipped: seed % 3 === 0,
+        memberBadge: t("orders.status.shippingAgency"),
+        userName: `Shipping Member ${seed}`,
+        receiver: `Receiver ${seed}`,
+        trackingCount: 1 + (seed % 5),
+        warehousedCount: 1 + (seed % 4),
+        qty,
+        totalAmount,
+        paidAmount: totalAmount,
+        weight: Number((2 + (seed % 8) * 0.8).toFixed(1)),
+        krTrack: seed % 3 === 0 ? `KR66${100000 + seed}` : "",
+        shipDate: `2026-04-${String(10 + (seed % 15)).padStart(2, "0")}`,
+        rack: `SA-${String((seed % 12) + 1).padStart(2, "0")}-${String((seed % 20) + 1).padStart(2, "0")}`,
+        warehouseStatus: t("orders.status.warehouseInProgress"),
+        progressStatus: item.label,
+        createdAt: `2026-04-${String(6 + (seed % 10)).padStart(2, "0")} 11:${String((seed * 5) % 60).padStart(2, "0")}`,
+        updatedAt: `2026-04-${String(8 + (seed % 10)).padStart(2, "0")} 16:${String((seed * 7) % 60).padStart(2, "0")}`,
+        inquiryResponder: "Auto",
+        buyer: "System",
+        adminMemo: `Shipping sample: ${item.label}`,
+        productMemo: "Auto-generated data",
+        caution: seed % 6 === 0 ? "Re-check packaging status" : "",
+        userMemo: "Generated for status count testing",
+        products: [
+          { id: `${orderNo}-1`, productNo: `SP-${60000 + seed}`, name: `Shipping Item A-${seed}`, option: "Default / Mixed", trackingNo: `CN26${5000000 + seed}`, orderNo, unitPrice, quantity: Math.max(1, qty - 2), totalPrice: Math.max(1, qty - 2) * unitPrice, shippingCost: 7000, rackNo: `SA-${String((seed % 12) + 1).padStart(2, "0")}`, prevRackNo: "", statusLabel: item.label, productMemo: "Auto-generated data", caution: seed % 6 === 0 ? "Re-check packaging status" : "", userMemo: "Generated for status count testing" },
+          { id: `${orderNo}-2`, productNo: `SP-${60100 + seed}`, name: `Shipping Item B-${seed}`, option: "Default / Box", trackingNo: `CN26${6000000 + seed}`, orderNo, unitPrice: unitPrice - 2000, quantity: 2, totalPrice: (unitPrice - 2000) * 2, shippingCost: 5000, rackNo: `SA-${String((seed % 12) + 1).padStart(2, "0")}`, prevRackNo: `SA-${String(((seed + 1) % 12) + 1).padStart(2, "0")}`, statusLabel: item.label, productMemo: `Line 2 · ${orderNo}`, caution: "", userMemo: "Generated for status count testing" },
+        ],
+      };
+    });
+  });
 
   const buttons = (
     <>
-      <button className="h-10 px-4 rounded-lg text-sm font-bold text-white bg-gradient-to-br from-blue-500 to-blue-700 flex items-center gap-2"><ScanBarcode className="w-4 h-4" />{t("orders.action.warehouseScan")}</button>
+      <button type="button" data-inbound-scan className="h-10 px-4 rounded-lg text-sm font-bold text-white bg-gradient-to-br from-blue-500 to-blue-700 flex items-center gap-2"><ScanBarcode className="w-4 h-4" />{t("orders.action.warehouseScan")}</button>
       <button className="h-10 px-4 rounded-lg text-sm font-bold text-white bg-gradient-to-br from-red-500 to-red-700 flex items-center gap-2"><AlertCircle className="w-4 h-4" />{t("orders.action.issueProduct")}</button>
       <button className="h-10 px-4 rounded-lg text-sm font-bold text-white bg-gradient-to-br from-green-500 to-green-700 flex items-center gap-2"><PackageCheck className="w-4 h-4" />{t("orders.action.outboundList")}</button>
       <div className="w-px h-10 bg-gray-300" />

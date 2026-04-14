@@ -98,10 +98,10 @@ export default function SMSPoints() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="app-table-wrap">
+        <table className="app-table">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr>
               <th className="px-4 py-3 text-center w-20">No</th>
               <th className="px-4 py-3 text-center w-40">
                 {t("sms.points.table.chargingPoint")}
@@ -126,10 +126,7 @@ export default function SMSPoints() {
               </tr>
             ) : (
               paginatedRecords.map((record) => (
-                <tr
-                  key={record.id}
-                  className="border-b border-gray-100 hover:bg-gray-50"
-                >
+                <tr key={record.id}>
                   <td className="px-4 py-3 text-center">{record.no}</td>
                   <td className="px-4 py-3 text-center">
                     {record.chargingPoint.toLocaleString()}

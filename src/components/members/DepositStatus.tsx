@@ -73,10 +73,10 @@ export default function DepositStatus() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="app-table-wrap">
+          <table className="app-table">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr>
                 <th className="text-left py-3 px-4 text-gray-600 font-medium w-36">{t("members.paymentMethod")}</th>
                 <th className="text-left py-3 px-4 text-gray-600 font-medium w-24">{t("members.userId")}</th>
                 <th className="text-left py-3 px-4 text-gray-600 font-medium w-36">{t("members.tr")}</th>
@@ -96,7 +96,7 @@ export default function DepositStatus() {
                 </tr>
               ) : (
                 paginatedData.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={item.id}>
                     <td className="py-3 px-4">{item.paymentMethod}</td>
                     <td className="py-3 px-4">{item.userId}</td>
                     <td className="py-3 px-4">{item.tr}</td>

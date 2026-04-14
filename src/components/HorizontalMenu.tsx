@@ -11,6 +11,8 @@ export default function HorizontalMenu() {
   const { t } = useLocale();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
+  /** Preview second row while pointer is over a top-level item (no click yet). */
+  const [hoveredTopKey, setHoveredTopKey] = useState<string | null>(null);
 
   const isActive = (item: MenuItem): boolean => {
     if (item.path && pathname === item.path) return true;
@@ -41,16 +43,31 @@ export default function HorizontalMenu() {
     (c) => c.key === activeSubmenu && c.children
   );
 
+  const menuForSecondRow =
+    (hoveredTopKey ? menuItems.find((m) => m.key === hoveredTopKey) : undefined) ??
+    activeMenuData;
+  const secondRowChildren = menuForSecondRow?.children;
+  const isSecondRowFromHover = Boolean(hoveredTopKey);
+  const showThirdRow =
+    Boolean(activeSubmenuData?.children) &&
+    (!hoveredTopKey || hoveredTopKey === activeMenu);
+
   return (
-    <div className="bg-white border-b border-gray-200 shrink-0">
+    <div
+      className="bg-white border-b border-gray-200 shrink-0"
+      onMouseLeave={() => setHoveredTopKey(null)}
+    >
       {/* Level 1: Main menu items - horizontal line */}
       <nav className="flex items-center px-4 overflow-x-auto">
         {menuItems.map((item) => (
           <button
             key={item.key}
+            type="button"
+            onMouseEnter={() => setHoveredTopKey(item.key)}
             onClick={() => {
               setActiveMenu(activeMenu === item.key ? null : item.key);
               setActiveSubmenu(null);
+              setHoveredTopKey(null);
             }}
             className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
               activeMenu === item.key
@@ -63,11 +80,15 @@ export default function HorizontalMenu() {
         ))}
       </nav>
 
-      {/* Level 2: Sub-menu items - horizontal line below */}
-      {activeMenuData?.children && (
-        <div className="bg-gray-50 border-t border-gray-200">
-          <nav className="flex items-center px-4 overflow-x-auto">
-            {activeMenuData.children.map((child) =>
+      {/* Level 2: Sub-menu — preview on hover; locked to clicked top item when pointer leaves */}
+      {secondRowChildren && (
+        <div
+          className={`border-t border-gray-200 transition-colors ${
+            isSecondRowFromHover ? "bg-slate-50/90 ring-1 ring-inset ring-blue-100" : "bg-gray-50"
+          }`}
+        >
+          <nav className="flex items-center px-4 overflow-x-auto min-h-[44px]">
+            {secondRowChildren.map((child) =>
               child.path ? (
                 <Link
                   key={child.key}
@@ -83,11 +104,17 @@ export default function HorizontalMenu() {
               ) : (
                 <button
                   key={child.key}
-                  onClick={() =>
-                    setActiveSubmenu(activeSubmenu === child.key ? null : child.key)
-                  }
+                  type="button"
+                  onClick={() => {
+                    if (menuForSecondRow?.key && menuForSecondRow.key !== activeMenu) {
+                      setActiveMenu(menuForSecondRow.key);
+                    }
+                    setHoveredTopKey(null);
+                    setActiveSubmenu(activeSubmenu === child.key ? null : child.key);
+                  }}
                   className={`px-4 py-2.5 text-sm whitespace-nowrap transition-colors border-b-2 ${
-                    activeSubmenu === child.key || isActive(child)
+                    (!hoveredTopKey || hoveredTopKey === activeMenu) &&
+                    (activeSubmenu === child.key || isActive(child))
                       ? "text-blue-600 border-blue-600 font-medium"
                       : "text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300"
                   }`}
@@ -100,8 +127,8 @@ export default function HorizontalMenu() {
         </div>
       )}
 
-      {/* Level 3: Nested sub-menu items - another horizontal line below */}
-      {activeSubmenuData?.children && (
+      {/* Level 3: Nested sub-menu — only when not previewing a different top section */}
+      {showThirdRow && activeSubmenuData?.children && (
         <div className="bg-gray-100 border-t border-gray-200">
           <nav className="flex items-center px-4 overflow-x-auto">
             {activeSubmenuData.children.map((sub) => (

@@ -28,9 +28,9 @@ export default function MailFormManagement() {
           </div>
         </div>
       </div>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 border-b"><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">No</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Template</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Subject</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Type</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Status</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Last Sent</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Updated</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Actions</th></tr></thead>
+      <div className="app-table-wrap">
+        <table className="app-table">
+          <thead><tr><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">No</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Template</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Subject</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Type</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Status</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Last Sent</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Updated</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Actions</th></tr></thead>
           <tbody>{data.length === 0 ? (<tr><td colSpan={8} className="py-20 text-center text-gray-400">{t("page.underConstruction")}</td></tr>) : null}</tbody>
         </table>
       </div>

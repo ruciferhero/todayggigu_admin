@@ -123,8 +123,8 @@ export default function PurchaseCostStats() {
           </div>
 
           {/* Summary Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse border border-gray-300 text-sm">
+          <div className="app-table-wrap">
+            <table className="app-table min-w-full">
               <thead>
                 <tr className="bg-gray-50">
                   <th className="border border-gray-300 px-3 py-2 text-left font-medium min-w-[200px]">
@@ -147,7 +147,7 @@ export default function PurchaseCostStats() {
                   </tr>
                 ) : (
                   summaryTableData.map((row) => (
-                    <tr key={row.key} className="hover:bg-gray-50">
+                    <tr key={row.key}>
                       <td className="border border-gray-300 px-3 py-2">{row.costItems}</td>
                       <td className="border border-gray-300 px-3 py-2 text-right">{row.totalWon}</td>
                       <td className="border border-gray-300 px-3 py-2 text-right">{row.yuanAmount}</td>
@@ -159,8 +159,8 @@ export default function PurchaseCostStats() {
           </div>
 
           {/* Detail Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse border border-gray-300 text-sm">
+          <div className="app-table-wrap">
+            <table className="app-table min-w-full">
               <thead>
                 <tr className="bg-gray-50">
                   {detailHeaders.map(({ key, align }) => (
@@ -184,7 +184,7 @@ export default function PurchaseCostStats() {
                   </tr>
                 ) : (
                   purchaseCostData.map((row) => (
-                    <tr key={row.key} className="hover:bg-gray-50">
+                    <tr key={row.key}>
                       {detailHeaders.map(({ key, align }) => (
                         <td key={key} className={`border border-gray-300 px-3 py-2 ${align}`}>
                           {row[key]}

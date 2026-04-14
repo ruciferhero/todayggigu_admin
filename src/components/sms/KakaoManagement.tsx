@@ -61,10 +61,10 @@ export default function KakaoManagement() {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="app-table-wrap">
+        <table className="app-table">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr>
               <th className="px-3 py-3 text-center w-16">No</th>
               <th className="px-3 py-3 text-left w-40">
                 {t("sms.kakao.table.name")}
@@ -98,10 +98,7 @@ export default function KakaoManagement() {
               </tr>
             ) : (
               paginatedRecords.map((record) => (
-                <tr
-                  key={record.id}
-                  className="border-b border-gray-100 hover:bg-gray-50 align-top"
-                >
+                <tr key={record.id} className="align-top">
                   <td className="px-3 py-3 text-center">{record.no}</td>
                   <td className="px-3 py-3">{record.name}</td>
                   <td className="px-3 py-3">

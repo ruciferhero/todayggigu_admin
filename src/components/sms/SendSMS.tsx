@@ -360,10 +360,10 @@ export default function SendSMS() {
               </div>
 
               {/* Member Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="app-table-wrap">
+                <table className="app-table">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
+                    <tr>
                       <th className="px-3 py-2 text-left w-10">
                         <input
                           type="checkbox"
@@ -405,10 +405,7 @@ export default function SendSMS() {
                       </tr>
                     ) : (
                       paginatedMembers.map((member) => (
-                        <tr
-                          key={member.id}
-                          className="border-b border-gray-100 hover:bg-gray-50"
-                        >
+                        <tr key={member.id}>
                           <td className="px-3 py-2">
                             <input
                               type="checkbox"

@@ -108,11 +108,11 @@ export default function MemberStatistics() {
               </div>
 
               {/* Annual Member Table */}
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-gray-300 text-sm">
+              <div className="app-table-wrap">
+                <table className="app-table min-w-full">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="border border-gray-300 px-3 py-2 text-left font-medium sticky left-0 bg-gray-50 min-w-[150px]">
+                      <th className="sticky left-0 z-[1] min-w-[150px] text-left font-medium">
                         {t("statistics.memberStatistics.memberType")}
                       </th>
                       <th className="border border-gray-300 px-3 py-2 text-left font-medium min-w-[180px]">
@@ -134,8 +134,8 @@ export default function MemberStatistics() {
                       </tr>
                     ) : (
                       annualMemberData.map((row) => (
-                        <tr key={row.key} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-3 py-2 font-medium sticky left-0 bg-white">
+                        <tr key={row.key}>
+                          <td className="sticky left-0 z-[1] font-medium">
                             {row.memberType}
                           </td>
                           <td className="border border-gray-300 px-3 py-2 font-medium">
@@ -193,11 +193,11 @@ export default function MemberStatistics() {
               </div>
 
               {/* Monthly Member Table */}
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-gray-300 text-sm">
+              <div className="app-table-wrap">
+                <table className="app-table min-w-full">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="border border-gray-300 px-3 py-2 text-left font-medium sticky left-0 bg-gray-50 min-w-[150px]">
+                      <th className="sticky left-0 z-[1] min-w-[150px] text-left font-medium">
                         {t("statistics.memberStatistics.memberType")}
                       </th>
                       <th className="border border-gray-300 px-3 py-2 text-left font-medium min-w-[180px]">
@@ -219,8 +219,8 @@ export default function MemberStatistics() {
                       </tr>
                     ) : (
                       monthlyMemberData.map((row) => (
-                        <tr key={row.key} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-3 py-2 font-medium sticky left-0 bg-white">
+                        <tr key={row.key}>
+                          <td className="sticky left-0 z-[1] font-medium">
                             {row.memberType}
                           </td>
                           <td className="border border-gray-300 px-3 py-2 font-medium">

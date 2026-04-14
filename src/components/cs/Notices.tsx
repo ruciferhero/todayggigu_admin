@@ -223,9 +223,9 @@ const Notices: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="app-table-wrap">
+        <table className="app-table min-w-full">
+          <thead>
             <tr>
               <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">
                 {t("cs.notices.number")}
@@ -244,7 +244,7 @@ const Notices: React.FC = () => {
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {data.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-gray-500 text-sm">
@@ -253,7 +253,7 @@ const Notices: React.FC = () => {
               </tr>
             ) : (
               data.map((record) => (
-                <tr key={record._id} className="hover:bg-gray-50">
+                <tr key={record._id}>
                   <td className="px-4 py-3 text-center text-sm">{record.number}</td>
                   <td className="px-4 py-3 text-sm">
                     <button

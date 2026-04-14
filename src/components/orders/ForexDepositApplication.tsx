@@ -59,9 +59,9 @@ export default function ForexDepositApplication() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead><tr className="bg-gray-50 border-b border-gray-200">
+      <div className="app-table-wrap">
+        <table className="app-table text-xs">
+          <thead><tr>
             <th className="px-3 py-2 text-left font-medium text-gray-500">No</th>
             <th className="px-3 py-2 text-left font-medium text-gray-500">Member</th>
             <th className="px-3 py-2 text-left font-medium text-gray-500">Depositor Company</th>
@@ -80,7 +80,7 @@ export default function ForexDepositApplication() {
           <tbody>
             {mockData.map((item, idx) => (
               <React.Fragment key={item.id}>
-                <tr className="border-b border-gray-100 hover:bg-gray-50/50">
+                <tr>
                   <td className="px-3 py-2">{idx + 1}</td>
                   <td className="px-3 py-2 text-blue-600 font-medium">{item.memberName}</td>
                   <td className="px-3 py-2">{item.depositorCompany}</td>

@@ -372,10 +372,10 @@ export default function CouponIssuance() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="app-table-wrap">
+          <table className="app-table">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr>
                 <th className="px-4 py-3 text-left w-10">
                   <input
                     type="checkbox"
@@ -422,10 +422,7 @@ export default function CouponIssuance() {
                 </tr>
               ) : (
                 paginatedRecords.map((record, index) => (
-                  <tr
-                    key={record.id}
-                    className="border-b border-gray-100 hover:bg-gray-50"
-                  >
+                  <tr key={record.id}>
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"

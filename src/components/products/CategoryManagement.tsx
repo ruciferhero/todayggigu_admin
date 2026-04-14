@@ -165,9 +165,9 @@ export default function CategoryManagement() {
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200">
-        <table className="w-full text-sm">
+        <table className="app-table">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr>
               <th className="text-left py-3 px-4 text-gray-600 font-medium w-12"></th>
               <th className="text-left py-3 px-4 text-gray-600 font-medium w-16">{t("products.no")}</th>
               <th className="text-left py-3 px-4 text-gray-600 font-medium">{t("products.categoryName")}</th>
@@ -187,7 +187,7 @@ export default function CategoryManagement() {
               level1Categories.map((cat, idx) => (
                 <React.Fragment key={cat._id}>
                   {/* Level 1 row */}
-                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr>
                     <td className="py-3 px-4">
                       <button
                         className="p-0.5 text-gray-400 hover:text-gray-600"

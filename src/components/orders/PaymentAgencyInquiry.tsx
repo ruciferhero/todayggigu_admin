@@ -26,9 +26,9 @@ export default function PaymentAgencyInquiry() {
           </div>
         </div>
       </div>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 border-b border-gray-200">
+      <div className="app-table-wrap">
+        <table className="app-table">
+          <thead><tr>
             <th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.no")}</th>
             <th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.inquiryNumber")}</th>
             <th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.membershipCode")}</th>

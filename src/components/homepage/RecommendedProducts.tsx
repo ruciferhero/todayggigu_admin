@@ -146,8 +146,8 @@ export default function RecommendedProducts() {
         </button>
       </div>
       <div className="border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+        <table className="app-table">
+          <thead>
             <tr>
               <th className="text-left px-4 py-3 font-medium w-16">{t("homepage.product.order")}</th>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.product.image")}</th>
@@ -163,7 +163,7 @@ export default function RecommendedProducts() {
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">{t("homepage.common.noData")}</td></tr>
             ) : (
               products.map((product) => (
-                <tr key={product.id} className="border-b hover:bg-gray-50">
+                <tr key={product.id}>
                   <td className="px-4 py-3">{product.order}</td>
                   <td className="px-4 py-3">{product.imageUrl ? <img src={product.imageUrl} alt="" className="w-14 h-14 object-cover rounded" /> : <div className="w-14 h-14 bg-gray-200 rounded" />}</td>
                   <td className="px-4 py-3">{product.recommendationType}</td>

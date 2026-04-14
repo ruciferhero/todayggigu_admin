@@ -9,7 +9,7 @@ import HorizontalMenu from "@/components/HorizontalMenu";
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [isNavigationVisible, setIsNavigationVisible] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -27,9 +27,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <Header onMenuToggle={() => setMenuOpen(!menuOpen)} />
-      <HorizontalMenu />
-      <main className="flex-1 p-6">{children}</main>
+      <Header onMenuToggle={() => setIsNavigationVisible((prev) => !prev)} />
+      {isNavigationVisible && <HorizontalMenu />}
+      <main className="flex-1 p-5 bg-gray-100">{children}</main>
     </div>
   );
 }

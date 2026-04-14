@@ -121,8 +121,8 @@ export default function WorkLogs() {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse border border-gray-300 text-sm">
+          <div className="app-table-wrap">
+            <table className="app-table min-w-full">
               <thead>
                 <tr className="bg-gray-50">
                   {columnKeys.map((col) => (
@@ -151,7 +151,7 @@ export default function WorkLogs() {
                   </tr>
                 ) : (
                   workerLogData.map((row) => (
-                    <tr key={row.key} className="hover:bg-gray-50">
+                    <tr key={row.key}>
                       {columnKeys.map((col) => (
                         <td
                           key={col}

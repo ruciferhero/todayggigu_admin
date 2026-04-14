@@ -66,12 +66,12 @@ export default function PaymentAgencyManagement() {
 
       <div className="flex justify-end"><button className="h-8 px-3 text-sm border border-gray-300 rounded-md flex items-center gap-1.5"><Download className="w-3.5 h-3.5" />{t("orders.action.excelDownload")}</button></div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 border-b border-gray-200"><th className="w-10 px-3 py-2"><input type="checkbox" className="rounded border-gray-300" /></th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">No</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.membershipCode")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Payment Type</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.orderNumber")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Amount</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Currency</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Status</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Request Date</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Completion</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Actions</th></tr></thead>
+      <div className="app-table-wrap">
+        <table className="app-table">
+          <thead><tr><th className="w-10 px-3 py-2"><input type="checkbox" className="rounded border-gray-300" /></th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">No</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.membershipCode")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Payment Type</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.orderNumber")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Amount</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Currency</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Status</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Request Date</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Completion</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Actions</th></tr></thead>
           <tbody>
             {data.map((row) => (
-              <tr key={row.no} className="border-b border-gray-100 hover:bg-gray-50">
+              <tr key={row.no}>
                 <td className="px-3 py-2"><input type="checkbox" className="rounded border-gray-300" /></td>
                 <td className="px-3 py-2">{row.no}</td>
                 <td className="px-3 py-2">{row.member}</td>

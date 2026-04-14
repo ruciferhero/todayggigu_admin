@@ -362,8 +362,8 @@ export default function BannerManagement() {
 
       {/* Table */}
       <div className="border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+        <table className="app-table">
+          <thead>
             <tr>
               <th className="text-left px-4 py-3 font-medium">
                 {t("homepage.banner.image")}
@@ -391,7 +391,7 @@ export default function BannerManagement() {
               </tr>
             ) : (
               filteredBanners.map((banner) => (
-                <tr key={banner.id} className="border-b hover:bg-gray-50">
+                <tr key={banner.id}>
                   <td className="px-4 py-3">
                     {banner.imageUrl ? (
                       <img

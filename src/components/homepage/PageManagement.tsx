@@ -136,8 +136,8 @@ export default function PageManagement() {
         </button>
       </div>
       <div className="border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+        <table className="app-table">
+          <thead>
             <tr>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.page.pageTitle")}</th>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.page.displayType")}</th>
@@ -149,7 +149,7 @@ export default function PageManagement() {
               <tr><td colSpan={3} className="text-center py-8 text-gray-400">{t("homepage.common.noData")}</td></tr>
             ) : (
               pages.map((page) => (
-                <tr key={page.id} className="border-b hover:bg-gray-50">
+                <tr key={page.id}>
                   <td className="px-4 py-3">{page.pageTitle}</td>
                   <td className="px-4 py-3">{page.displayType}</td>
                   <td className="px-4 py-3 text-center">

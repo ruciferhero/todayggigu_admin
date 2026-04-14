@@ -64,9 +64,9 @@ export default function ForexDepositSettlement() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead><tr className="bg-gray-50 border-b border-gray-200">
+      <div className="app-table-wrap">
+        <table className="app-table text-xs">
+          <thead><tr>
             <th className="px-3 py-2 text-left font-medium text-gray-500">No</th>
             <th className="px-3 py-2 text-left font-medium text-gray-500">Member</th>
             <th className="px-3 py-2 text-center font-medium text-gray-500">Classification</th>
@@ -82,7 +82,7 @@ export default function ForexDepositSettlement() {
           <tbody>
             {mockData.map((item, idx) => (
               <React.Fragment key={item.id}>
-                <tr className="border-b border-gray-100 hover:bg-gray-50/50">
+                <tr>
                   <td className="px-3 py-2">{idx + 1}</td>
                   <td className="px-3 py-2"><div className="text-blue-600 font-medium">{item.memberName}</div><div className="text-gray-400">{item.mailbox}</div></td>
                   <td className="px-3 py-2 text-center"><span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${classColors[item.classification]}`}>{item.classification}</span></td>

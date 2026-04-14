@@ -68,10 +68,10 @@ export default function RocketNoData() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="app-table-wrap">
+        <table className="app-table">
           <thead>
-            <tr className="bg-gray-50 border-b">
+            <tr>
               <th className="px-3 py-2 text-xs font-medium text-gray-500">{t("orders.common.no")}</th>
               <th className="px-3 py-2 text-xs font-medium text-gray-500">{t("orders.common.trackingNumber")}</th>
               <th className="px-3 py-2 text-xs font-medium text-gray-500">{t("orders.common.membershipCode")}</th>

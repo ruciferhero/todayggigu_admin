@@ -154,8 +154,8 @@ export default function DepartureSchedule() {
         </button>
       </div>
       <div className="border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+        <table className="app-table">
+          <thead>
             <tr>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.schedule.center")}</th>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.schedule.transportMethod")}</th>
@@ -170,7 +170,7 @@ export default function DepartureSchedule() {
               <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t("homepage.common.noData")}</td></tr>
             ) : (
               schedules.map((schedule) => (
-                <tr key={schedule.id} className="border-b hover:bg-gray-50">
+                <tr key={schedule.id}>
                   <td className="px-4 py-3">{schedule.center}</td>
                   <td className="px-4 py-3">{schedule.transportMethod}</td>
                   <td className="px-4 py-3">{schedule.departureDate}</td>

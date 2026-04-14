@@ -109,10 +109,10 @@ const RackManagement: React.FC = () => {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="app-table-wrap">
+          <table className="app-table">
             <thead>
-              <tr className="bg-gray-50 border-b">
+              <tr>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">{t("rack.management.rackDefinition")}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">{t("rack.management.rackCode")}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">{t("rack.management.size")}</th>
@@ -126,7 +126,7 @@ const RackManagement: React.FC = () => {
             </thead>
             <tbody>
               {records.map((record) => (
-                <tr key={record.id} className="border-b hover:bg-gray-50">
+                <tr key={record.id}>
                   <td className="px-4 py-3">{record.rackDefinition}</td>
                   <td className="px-4 py-3">{record.rackCode}</td>
                   <td className="px-4 py-3">{record.size}</td>
@@ -225,7 +225,7 @@ const RackManagement: React.FC = () => {
                 <span><strong>{t("rack.management.availableRacks")}:</strong> {selectedRack.totalRacks - selectedRack.usedRacks}</span>
                 <span><strong>{t("rack.management.usedRacks")}:</strong> {selectedRack.usedRacks}</span>
               </div>
-              <table className="w-full text-sm border-collapse">
+              <table className="app-table">
                 <thead>
                   <tr className="bg-gray-100">
                     {[0, 1, 2].map((col) => (

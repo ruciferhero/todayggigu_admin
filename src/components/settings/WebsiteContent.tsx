@@ -18,9 +18,9 @@ export default function WebsiteContent() {
         </div>
       </div>
       
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 border-b border-gray-200">
+      <div className="app-table-wrap">
+        <table className="app-table">
+          <thead><tr>
             <th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">No</th>
             <th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Page</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Section</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Language</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Content Preview</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Last Updated</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Editor</th>
             <th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">Actions</th>

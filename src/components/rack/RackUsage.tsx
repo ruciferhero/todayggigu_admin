@@ -38,10 +38,10 @@ const RackUsage: React.FC = () => {
       <h1 className="text-2xl font-bold mb-6">{t("rack.usage.title")}</h1>
 
       <div className="bg-white rounded-lg shadow">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="app-table-wrap">
+          <table className="app-table">
             <thead>
-              <tr className="bg-gray-50 border-b">
+              <tr>
                 <th className="px-4 py-3 text-center font-medium text-gray-700">{t("rack.usage.rackCode")}</th>
                 <th className="px-4 py-3 text-center font-medium text-gray-700">{t("rack.usage.rackNumber")}</th>
                 <th className="px-4 py-3 text-center font-medium text-gray-700">{t("rack.usage.size")}</th>
@@ -54,7 +54,7 @@ const RackUsage: React.FC = () => {
             </thead>
             <tbody>
               {sampleData.map((record) => (
-                <tr key={record.id} className="border-b hover:bg-gray-50">
+                <tr key={record.id}>
                   <td className="px-4 py-3 text-center">{record.rackCode}</td>
                   <td className="px-4 py-3 text-center">{record.rackNumber}</td>
                   <td className="px-4 py-3 text-center">{record.size}</td>

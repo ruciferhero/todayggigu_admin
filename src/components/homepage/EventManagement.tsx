@@ -188,8 +188,8 @@ export default function EventManagement() {
         </button>
       </div>
       <div className="border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+        <table className="app-table">
+          <thead>
             <tr>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.event.thumbnail")}</th>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.event.title")}</th>
@@ -203,7 +203,7 @@ export default function EventManagement() {
               <tr><td colSpan={5} className="text-center py-8 text-gray-400">{t("homepage.common.noData")}</td></tr>
             ) : (
               events.map((event) => (
-                <tr key={event.id} className="border-b hover:bg-gray-50">
+                <tr key={event.id}>
                   <td className="px-4 py-3">{event.thumbnail ? <img src={event.thumbnail} alt="" className="w-14 h-14 object-cover rounded" /> : <div className="w-14 h-14 bg-gray-200 rounded" />}</td>
                   <td className="px-4 py-3">{event.title}</td>
                   <td className="px-4 py-3">{event.period}</td>

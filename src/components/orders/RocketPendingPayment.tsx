@@ -87,10 +87,10 @@ export default function RocketPendingPayment() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="app-table-wrap">
+        <table className="app-table">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr>
               <th className="w-10 px-3 py-2"><input type="checkbox" className="rounded border-gray-300" /></th>
               <th className="px-3 py-2 text-xs font-medium text-gray-500">No</th>
               <th className="px-3 py-2 text-xs font-medium text-gray-500">{t("orders.common.orderNumber")}</th>

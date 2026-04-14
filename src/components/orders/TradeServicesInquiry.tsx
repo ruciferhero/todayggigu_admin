@@ -26,9 +26,9 @@ export default function TradeServicesInquiry() {
           </div>
         </div>
       </div>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 border-b"><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.no")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.tradeNumber")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.membershipCode")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.subject")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.content")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.status")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.createdAt")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.actions")}</th></tr></thead>
+      <div className="app-table-wrap">
+        <table className="app-table">
+          <thead><tr><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.no")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.tradeNumber")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.membershipCode")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.subject")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.content")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.status")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.createdAt")}</th><th className="px-3 py-2 text-xs font-medium text-gray-500 text-left">{t("orders.common.actions")}</th></tr></thead>
           <tbody>{data.length === 0 ? (<tr><td colSpan={8} className="py-20 text-center text-gray-400">{t("page.underConstruction")}</td></tr>) : null}</tbody>
         </table>
       </div>

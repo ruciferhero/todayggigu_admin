@@ -25,3 +25,124 @@ body {
   background: #94a3b8;
   border-radius: 3px;
 }
+
+/* ── Data tables (match OrderBoard / order cancellation) ───────────── */
+.app-table-wrap {
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(203 213 225);
+  background: rgb(255 255 255);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+table.app-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+table.app-table.table-fixed {
+  table-layout: fixed;
+}
+
+table.app-table.text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+table.app-table-compact thead th,
+table.app-table-compact tbody td {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+table.app-table thead th {
+  border-bottom: 2px solid #000000;
+  border-right: 1px solid #000000;
+  background: #5f697d !important;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ffffff !important;
+  vertical-align: middle;
+  border-color: #000000 !important;
+}
+
+table.app-table thead th:last-child {
+  border-right-width: 0;
+}
+
+table.app-table tbody tr {
+  border-bottom: 1px solid rgb(226 232 240);
+}
+
+table.app-table tbody tr:hover td {
+  background: rgb(240 249 255);
+}
+
+table.app-table tbody td {
+  border-right: 1px solid rgb(226 232 240);
+  background: rgb(255 255 255);
+  padding: 0.5rem 0.625rem;
+  vertical-align: middle;
+  transition: background-color 150ms ease-out;
+}
+
+table.app-table tbody td:last-child {
+  border-right-width: 0;
+}
+
+/* Form-style tables (label column uses th inside tbody) */
+table.app-table tbody th {
+  border-bottom: 1px solid #000000;
+  border-right: 1px solid #000000;
+  background: #5f697d !important;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #ffffff !important;
+  text-align: left;
+  vertical-align: middle;
+  border-color: #000000 !important;
+}
+
+table.app-table tbody tr:hover th {
+  background: #6b7589 !important;
+}
+
+/* Sticky actions column (main order board) */
+table.app-table thead th.app-table-sticky-head {
+  position: sticky;
+  right: 0;
+  z-index: 10;
+  border-left: 1px solid #000000 !important;
+  border-right-width: 0;
+  border-bottom: 2px solid #000000 !important;
+  background: #5f697d !important;
+  box-shadow: -6px 0 10px -4px rgba(0, 0, 0, 0.15);
+  padding: 0.5rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #ffffff !important;
+  vertical-align: middle;
+  text-align: center;
+  border-color: #000000 !important;
+}
+
+table.app-table tbody td.app-table-sticky-cell {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  border-left: 1px solid rgb(203 213 225);
+  border-right-width: 0;
+  background: rgb(255 255 255);
+  box-shadow: -6px 0 10px -4px rgba(15, 23, 42, 0.08);
+  padding: 0.5rem 0.625rem;
+  vertical-align: top;
+  transition: background-color 150ms ease-out;
+}
+
+table.app-table tbody tr:hover td.app-table-sticky-cell {
+  background: rgb(240 249 255);
+}

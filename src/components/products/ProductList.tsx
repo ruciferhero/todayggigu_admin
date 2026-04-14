@@ -107,8 +107,8 @@ export default function ProductList() {
             {t("products.addStore")}
           </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="app-table-wrap">
+          <table className="app-table">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-2 px-3 text-gray-500 font-medium w-12">No</th>
@@ -232,10 +232,10 @@ export default function ProductList() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="app-table-wrap">
+          <table className="app-table">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr>
                 <th className="py-3 px-3 w-10">
                   <input
                     type="checkbox"
@@ -269,7 +269,7 @@ export default function ProductList() {
                 </tr>
               ) : (
                 paginatedProducts.map((product) => (
-                  <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={product.id}>
                     <td className="py-3 px-3">
                       <input
                         type="checkbox"

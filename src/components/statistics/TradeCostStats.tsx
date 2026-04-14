@@ -115,8 +115,8 @@ export default function TradeCostStats() {
           </div>
 
           {/* Summary Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse border border-gray-300 text-sm">
+          <div className="app-table-wrap">
+            <table className="app-table min-w-full">
               <thead>
                 <tr className="bg-gray-50">
                   {summaryHeaders.map((h) => (
@@ -140,8 +140,8 @@ export default function TradeCostStats() {
                   </tr>
                 ) : (
                   summaryData.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 px-3 py-2 sticky left-0 bg-white">
+                    <tr key={idx}>
+                      <td className="sticky left-0 z-[1]">
                         {row.applicationType}
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-center">{row.chibaYonggun1}</td>
@@ -161,8 +161,8 @@ export default function TradeCostStats() {
           {/* Detail Table */}
           <div>
             <h3 className="text-base font-semibold mb-4">{t("statistics.tradeCost.detailList")}</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse border border-gray-300 text-sm">
+            <div className="app-table-wrap">
+              <table className="app-table min-w-full">
                 <thead>
                   <tr className="bg-gray-50">
                     {detailHeaders.map((h) => (
@@ -186,7 +186,7 @@ export default function TradeCostStats() {
                     </tr>
                   ) : (
                     detailData.map((row) => (
-                      <tr key={row.key} className="hover:bg-gray-50">
+                      <tr key={row.key}>
                         <td className="border border-gray-300 px-3 py-2 text-center">{row.no}</td>
                         <td className="border border-gray-300 px-3 py-2">{row.tradeNumber}</td>
                         <td className="border border-gray-300 px-3 py-2">{row.applicationType}</td>

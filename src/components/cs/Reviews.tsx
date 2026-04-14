@@ -141,9 +141,9 @@ const Reviews: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="app-table-wrap">
+        <table className="app-table min-w-full">
+          <thead>
             <tr>
               <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">{t("cs.reviews.number")}</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-96">{t("cs.reviews.fieldTitle")}</th>
@@ -152,14 +152,14 @@ const Reviews: React.FC = () => {
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-44">{t("cs.reviews.createdAt")}</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {data.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-gray-500 text-sm">{t("cs.common.noData")}</td>
               </tr>
             ) : (
               data.map((record) => (
-                <tr key={record._id} className="hover:bg-gray-50">
+                <tr key={record._id}>
                   <td className="px-4 py-3 text-center text-sm">{record.number}</td>
                   <td className="px-4 py-3 text-sm">
                     <button onClick={() => handleView(record)} className="text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[400px] block text-left">

@@ -98,10 +98,10 @@ export default function SendingHistory() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="app-table-wrap">
+        <table className="app-table">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr>
               <th className="px-4 py-3 text-center w-16">No</th>
               <th className="px-4 py-3 text-left w-60">
                 {t("sms.history.sendInfo")}
@@ -129,10 +129,7 @@ export default function SendingHistory() {
               </tr>
             ) : (
               paginatedRecords.map((record) => (
-                <tr
-                  key={record.id}
-                  className="border-b border-gray-100 hover:bg-gray-50"
-                >
+                <tr key={record.id}>
                   <td className="px-4 py-3 text-center">{record.no}</td>
                   <td className="px-4 py-3">
                     <div>{record.recipient}</div>

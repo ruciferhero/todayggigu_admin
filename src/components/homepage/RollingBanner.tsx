@@ -247,8 +247,8 @@ export default function RollingBanner() {
       </div>
 
       <div className="border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+        <table className="app-table">
+          <thead>
             <tr>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.banner.image")}</th>
               <th className="text-left px-4 py-3 font-medium">{t("homepage.banner.title")}</th>
@@ -267,7 +267,7 @@ export default function RollingBanner() {
               </tr>
             ) : (
               banners.map((banner) => (
-                <tr key={banner.id} className="border-b hover:bg-gray-50">
+                <tr key={banner.id}>
                   <td className="px-4 py-3">
                     {banner.imageUrl ? (
                       <img src={banner.imageUrl} alt={banner.title} className="w-20 h-14 object-cover rounded" />

@@ -75,8 +75,8 @@ export default function WorkerStatistics() {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse border border-gray-300 text-sm">
+          <div className="app-table-wrap">
+            <table className="app-table min-w-full">
               <thead>
                 <tr className="bg-gray-50">
                   {columns.map(({ key, align, width }) => (
@@ -95,7 +95,7 @@ export default function WorkerStatistics() {
                   </tr>
                 ) : (
                   workerData.map((row) => (
-                    <tr key={row.key} className="hover:bg-gray-50">
+                    <tr key={row.key}>
                       <td className="border border-gray-300 px-3 py-2 font-medium">{row.workerName}</td>
                       <td className="border border-gray-300 px-3 py-2 text-center">
                         {row.numberOfActualCases === 0 ? "0" : row.numberOfActualCases.toLocaleString()}

@@ -70,9 +70,9 @@ export default function ForexDepositUsage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead><tr className="bg-gray-50 border-b border-gray-200">
+      <div className="app-table-wrap">
+        <table className="app-table text-xs">
+          <thead><tr>
             <th className="px-3 py-2 text-left font-medium text-gray-500">No</th>
             <th className="px-3 py-2 text-left font-medium text-gray-500">Member</th>
             <th className="px-3 py-2 text-left font-medium text-gray-500">Classification</th>
@@ -85,7 +85,7 @@ export default function ForexDepositUsage() {
           </tr></thead>
           <tbody>
             {mockData.map((item, idx) => (
-              <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50/50">
+              <tr key={item.id}>
                 <td className="px-3 py-2">{idx + 1}</td>
                 <td className="px-3 py-2"><div className="text-blue-600 font-medium">{item.memberName}</div><div className="text-gray-400">{item.mailbox}</div></td>
                 <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${classColors[item.classification]}`}>{classLabels[item.classification]}</span></td>

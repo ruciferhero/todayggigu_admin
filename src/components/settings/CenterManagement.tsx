@@ -99,10 +99,10 @@ const CenterManagement: React.FC = () => {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="app-table-wrap">
+          <table className="app-table">
             <thead>
-              <tr className="bg-gray-50 border-b">
+              <tr>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">{t("settings.center.nation")}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">{t("settings.center.center")}</th>
                 <th className="px-4 py-3 text-center font-medium text-gray-700">{t("settings.center.centerCode")}</th>
@@ -117,7 +117,7 @@ const CenterManagement: React.FC = () => {
             </thead>
             <tbody>
               {sampleData.map((record) => (
-                <tr key={record.id} className="border-b hover:bg-gray-50">
+                <tr key={record.id}>
                   <td className="px-4 py-3">{record.nation}</td>
                   <td className="px-4 py-3">{record.center}</td>
                   <td className="px-4 py-3 text-center">{record.centerCode}</td>

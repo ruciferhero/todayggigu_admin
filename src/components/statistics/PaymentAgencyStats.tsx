@@ -85,11 +85,11 @@ export default function PaymentAgencyStats() {
               </div>
 
               {/* Annual Payment Agency Table */}
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-gray-300 text-sm">
+              <div className="app-table-wrap">
+                <table className="app-table min-w-full">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="border border-gray-300 px-3 py-2 text-left font-medium sticky left-0 bg-gray-50 min-w-[180px]">
+                      <th className="sticky left-0 z-[1] min-w-[180px] text-left font-medium">
                         {t("statistics.paymentAgency.applicationItem")}
                       </th>
                       {months.map((m) => (
@@ -108,8 +108,8 @@ export default function PaymentAgencyStats() {
                       </tr>
                     ) : (
                       annualPaymentData.map((row) => (
-                        <tr key={row.key} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-3 py-2 font-medium sticky left-0 bg-white">
+                        <tr key={row.key}>
+                          <td className="sticky left-0 z-[1] font-medium">
                             {row.applicationItem}
                           </td>
                           {months.map((m) => (
@@ -126,11 +126,11 @@ export default function PaymentAgencyStats() {
 
               {/* Annual Payment Cost */}
               <h3 className="text-base font-semibold mt-6">{t("statistics.paymentAgency.annualPaymentCost")}</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-gray-300 text-sm">
+              <div className="app-table-wrap">
+                <table className="app-table min-w-full">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="border border-gray-300 px-3 py-2 text-left font-medium sticky left-0 bg-gray-50 min-w-[180px]">
+                      <th className="sticky left-0 z-[1] min-w-[180px] text-left font-medium">
                         {t("statistics.paymentAgency.applicationItem")}
                       </th>
                       {months.map((m) => (
@@ -149,8 +149,8 @@ export default function PaymentAgencyStats() {
                       </tr>
                     ) : (
                       annualPaymentCostData.map((row) => (
-                        <tr key={row.key} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-3 py-2 font-medium sticky left-0 bg-white">
+                        <tr key={row.key}>
+                          <td className="sticky left-0 z-[1] font-medium">
                             {row.applicationItem}
                           </td>
                           {months.map((m) => (
@@ -195,11 +195,11 @@ export default function PaymentAgencyStats() {
               </div>
 
               {/* Monthly Payment Agency Table */}
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-gray-300 text-sm">
+              <div className="app-table-wrap">
+                <table className="app-table min-w-full">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="border border-gray-300 px-3 py-2 text-left font-medium sticky left-0 bg-gray-50 min-w-[180px]">
+                      <th className="sticky left-0 z-[1] min-w-[180px] text-left font-medium">
                         {t("statistics.paymentAgency.applicationItem")}
                       </th>
                       {Array.from({ length: 31 }, (_, i) => (
@@ -218,8 +218,8 @@ export default function PaymentAgencyStats() {
                       </tr>
                     ) : (
                       monthlyPaymentData.map((row) => (
-                        <tr key={row.key} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-3 py-2 font-medium sticky left-0 bg-white">
+                        <tr key={row.key}>
+                          <td className="sticky left-0 z-[1] font-medium">
                             {row.applicationItem}
                           </td>
                           {Array.from({ length: 31 }, (_, i) => (
@@ -236,11 +236,11 @@ export default function PaymentAgencyStats() {
 
               {/* Monthly Payment Fee */}
               <h3 className="text-base font-semibold mt-6">{t("statistics.paymentAgency.monthlyPaymentFee")}</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-gray-300 text-sm">
+              <div className="app-table-wrap">
+                <table className="app-table min-w-full">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="border border-gray-300 px-3 py-2 text-left font-medium sticky left-0 bg-gray-50 min-w-[180px]">
+                      <th className="sticky left-0 z-[1] min-w-[180px] text-left font-medium">
                         {t("statistics.paymentAgency.applicationItem")}
                       </th>
                       {Array.from({ length: 31 }, (_, i) => (
@@ -259,8 +259,8 @@ export default function PaymentAgencyStats() {
                       </tr>
                     ) : (
                       monthlyPaymentFeeData.map((row) => (
-                        <tr key={row.key} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-3 py-2 font-medium sticky left-0 bg-white">
+                        <tr key={row.key}>
+                          <td className="sticky left-0 z-[1] font-medium">
                             {row.applicationItem}
                           </td>
                           {Array.from({ length: 31 }, (_, i) => (

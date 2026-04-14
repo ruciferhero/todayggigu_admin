@@ -87,10 +87,10 @@ export default function OrderInquiry() {
       </div>
 
       {/* Data Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="app-table-wrap">
+        <table className="app-table">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+            <tr>
               <th className="w-12 px-2 py-2 text-center text-xs font-medium text-gray-500">No</th>
               <th className="w-[140px] px-3 py-2 text-center text-xs font-medium text-gray-500">
                 {t("orders.inquiry.orderNo")}
@@ -130,7 +130,7 @@ export default function OrderInquiry() {
               </tr>
             ) : (
               inquiries.map((inquiry, index) => (
-                <tr key={inquiry.key} className="border-b border-gray-100 hover:bg-gray-50/50">
+                <tr key={inquiry.key}>
                   <td className="px-2 py-2 text-center text-xs text-gray-500">
                     {(currentPage - 1) * pageSize + index + 1}
                   </td>

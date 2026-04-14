@@ -78,6 +78,8 @@ interface Props {
   actionButtons?: React.ReactNode;
   /** 구매대행 주문: 상태별 관리 버튼 (개인·주문복사·주문문의 공통 + 상태별 추가) */
   purchaseAgencyRowActions?: boolean;
+  /** 설정 시 필터·툴바·주문 테이블·페이지네이션 대신 이 콘텐츠만 표시 */
+  mainPanelOverride?: React.ReactNode;
 }
 
 /** i18n keys for purchase-agency row actions (first three are always shown). */
@@ -227,6 +229,7 @@ function applyOrderBoardSearchFilters(
 export default function OrderBoard({
   title, defaultSelectedLabel, memberFilterLabel, memberFilterPlaceholder,
   statusGroups, orders, actionButtons, purchaseAgencyRowActions = false,
+  mainPanelOverride,
 }: Props) {
   const { t } = useLocale();
 
@@ -391,8 +394,12 @@ export default function OrderBoard({
         </div>
       )}
 
-      {/* ── Table ───────────────────────────────────────────────── */}
+      {/* ── Table (또는 mainPanelOverride로 대체) ───────────────────── */}
       <div className=" bg-white border rounded-md p-4 border-gray-300" >
+        {mainPanelOverride != null ? (
+          mainPanelOverride
+        ) : (
+        <>
         {/* ── Filters ───────────────────────────────────────────────── */}
         <form
           className="bg-white rounded-sm border border-gray-300 p-3"
@@ -529,7 +536,7 @@ export default function OrderBoard({
         </form>
 
         {/* ── Toolbar ───────────────────────────────────────────────── */}
-        {/* <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-3">
           <div className="flex items-center gap-2">
             <select className="h-8 px-3 text-sm border border-gray-300 rounded-md">
               <option value="">{t("orders.action.statusChangeSelect")}</option>
@@ -555,20 +562,17 @@ export default function OrderBoard({
               <Upload className="w-3.5 h-3.5" />{t("orders.action.trackingBatchRegister")}
             </button>
           </div>
-        </div> */}
+        </div>
 
         {/* ── Order table ───────────────────────────────────────────── */}
-        <div className="mt-4 app-table-wrap">
-          <table className="app-table table-fixed">
-            <colgroup>
-              {Array.from({ length: 10 }, (_, i) => (
-                <col key={i} style={{ width: ORDER_BOARD_DATA_COL_W }} />
-              ))}
-              <col style={{ width: ORDER_BOARD_ACTION_COL_W }} />
-            </colgroup>
+        {/* <div className="mt-4 app-table-wrap">
+          <table className="app-table table-fixed"> */}
+        <div className="app-table-wrap table-fixed w-full">
+        
+          <table className="app-table text-xs">
             <thead>
               <tr className="bg-gray-500">
-                <th className="text-center">{t("orders.common.orderNumber")}</th>
+                <th className="text-center w-3/22">{t("orders.common.orderNumber")}</th>
                 <th className="text-center">
                   <div>{t("orders.common.center")}</div>
                   <div>{t("orders.common.applicationType")}</div>
@@ -603,11 +607,11 @@ export default function OrderBoard({
                   <div>{t("orders.common.createdAt")}</div>
                   <div>{t("orders.common.updatedAt")}</div>
                 </th>
-                <th className="text-center">
+                {/* <th className="text-center">
                   <div>{t("orders.common.inquiryResponder")}</div>
                   <div>{t("orders.common.buyer")}</div>
-                </th>
-                <th className="app-table-sticky-head">{t("orders.common.actions")}</th>
+                </th> */}
+                <th className="app-table-sticky-head w-3/22">{t("orders.common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -692,10 +696,10 @@ export default function OrderBoard({
                       <div className="text-[11px] text-gray-400">{order.updatedAt}</div>
                     </td>
                     {/* Responder / Buyer */}
-                    <td className="text-center">
+                    {/* <td className="text-center">
                       {order.inquiryResponder ? <span className="text-xs text-blue-600">{order.inquiryResponder}</span> : <span className="text-xs text-gray-400">{t("orders.common.none")}</span>}
                       <div className="text-[11px]">{order.buyer ?? "-"}</div>
-                    </td>
+                    </td> */}
                     {/* Actions */}
                     <td className="app-table-sticky-cell">
                       <div className="grid w-full grid-cols-2 gap-1">
@@ -728,11 +732,11 @@ export default function OrderBoard({
                       <td colSpan={10} className="px-6 py-4 ">
                         {/* Admin memo */}
                         <div className="flex items-center gap-2 text-xs mb-3">
-                          <span className="font-bold min-w-[100px]">{t("orders.expanded.adminMemo")}:</span>
+                          <span className="font-bold min-w-[100px]">{t("orders.expanded.orderMemo")}:</span>
                           <input
                             type="text"
                             defaultValue={order.adminMemo ?? ""}
-                            placeholder={t("orders.expanded.adminMemoPlaceholder")}
+                            placeholder={t("orders.expanded.orderMemoPlaceholder")}
                             className="flex-1 h-8 px-3 text-xs border border-gray-300 rounded-md"
                           />
                           <button className="h-8 px-3 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700">
@@ -892,6 +896,8 @@ export default function OrderBoard({
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {inboundScanOpen && (

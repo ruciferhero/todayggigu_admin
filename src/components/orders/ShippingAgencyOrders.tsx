@@ -14,12 +14,7 @@ export default function ShippingAgencyOrders() {
       color: "text-teal-600",
       items: [
         { label: t("orders.status.tempSave"), code: "DEL_TEMP" },
-        { label: t("orders.status.purchaseQuote"), code: "DEL_EST" },
-        { label: t("orders.status.purchasePaymentPending"), code: "DEL_PAY_WAIT" },
-        { label: t("orders.status.purchasePaymentComplete"), code: "DEL_PAY_DONE" },
-        { label: t("orders.status.purchasing"), code: "DEL_BUYING" },
-        { label: t("orders.status.problemProduct"), code: "DEL_PROBLEM" },
-        { label: t("orders.status.purchaseComplete"), code: "DEL_COMPLETE" },
+        { label: t("orders.status.receiptApplication"), code: "DEL_RECEIPT_APP" },
       ],
     },
     {
@@ -28,7 +23,6 @@ export default function ShippingAgencyOrders() {
       color: "text-blue-500",
       items: [
         { label: t("orders.status.centerArrivalExpected"), code: "WH_ARRIVE_EXPECTED" },
-        { label: t("orders.status.localDeliveryDelay"), code: "LOCAL_DELAY" },
         { label: t("orders.status.warehouseInProgress"), code: "WH_IN_PROGRESS" },
         { label: t("orders.status.warehouseInComplete"), code: "WH_IN_DONE" },
         { label: t("orders.status.shipmentPaymentPending"), code: "SHIP_PAY_WAIT" },
@@ -45,17 +39,17 @@ export default function ShippingAgencyOrders() {
       color: "text-red-500",
       items: [
         { label: t("orders.status.errorWarehouse"), code: "ERR_IN" },
-        { label: t("orders.status.userRefundRequest"), code: "USER_REFUND_REQ" },
-        { label: t("orders.status.userRefundProcessing"), code: "USER_REFUND_ING" },
-        { label: t("orders.status.userRefundComplete"), code: "USER_REFUND_DONE" },
-        { label: t("orders.status.platformRefundRequest"), code: "PLAT_REFUND_REQ" },
-        { label: t("orders.status.platformRefundProcessing"), code: "PLAT_REFUND_ING" },
-        { label: t("orders.status.platformRefundComplete"), code: "PLAT_REFUND_DONE" },
-        { label: t("orders.status.finalRefundRequest"), code: "FINAL_REFUND_REQ" },
-        { label: t("orders.status.finalRefundProcessing"), code: "FINAL_REFUND_ING" },
-        { label: t("orders.status.finalRefundComplete"), code: "FINAL_REFUND_DONE" },
-        { label: t("orders.status.orderDisposal"), code: "ORDER_DISPOSAL" },
-        { label: t("orders.status.shipmentHold"), code: "HOLD" },
+      ],
+    },
+    {
+      title: t("orders.status.return"),
+      icon: <Package className="w-4 h-4" />,
+      color: "text-yellow-500",
+      items: [
+        { label: t("orders.status.returnRequest"), code: "RETURN_REQUEST" },
+        { label: t("orders.status.returnPaymentPending"), code: "RETURN_PAYMENT_PENDING" },
+        { label: t("orders.status.returnPaymentComplete"), code: "RETURN_PAYMENT_COMPLETE" },
+        { label: t("orders.status.returnComplete"), code: "RETURN_COMPLETE" },
       ],
     },
   ];

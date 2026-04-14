@@ -113,15 +113,15 @@ table.app-table tbody tr:hover th {
 
 /* Sticky actions column (main order board) */
 table.app-table thead th.app-table-sticky-head {
-  position: sticky;
-  right: 0;
-  z-index: 10;
+  /* position: sticky; */
+  /* right: 0; */
+  /* z-index: 10; */
   border-left: 1px solid #000000 !important;
   border-right-width: 0;
   border-bottom: 2px solid #000000 !important;
   background: #5f697d !important;
   box-shadow: -6px 0 10px -4px rgba(0, 0, 0, 0.15);
-  padding: 0.5rem 0.625rem;
+  /* padding: 0.5rem 0.625rem; */
   font-size: 0.6875rem;
   font-weight: 600;
   color: #ffffff !important;
@@ -131,14 +131,14 @@ table.app-table thead th.app-table-sticky-head {
 }
 
 table.app-table tbody td.app-table-sticky-cell {
-  position: sticky;
-  right: 0;
-  z-index: 1;
+  /* position: sticky; */
+  /* right: 0; */
+  /* z-index: 1; */
   border-left: 1px solid rgb(203 213 225);
   border-right-width: 0;
   background: rgb(255 255 255);
   box-shadow: -6px 0 10px -4px rgba(15, 23, 42, 0.08);
-  padding: 0.5rem 0.625rem;
+  /* padding: 0.5rem 0.625rem; */
   vertical-align: top;
   transition: background-color 150ms ease-out;
 }

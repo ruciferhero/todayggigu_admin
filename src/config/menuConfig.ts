@@ -174,7 +174,7 @@ export const menuItems: MenuItem[] = [
       { key: "settings-center", labelKey: "submenu.centerManagement", path: "/admin/settings/center" },
       { key: "settings-deposit", labelKey: "submenu.depositAccounts", path: "/admin/settings/deposit-accounts" },
       { key: "settings-membership", labelKey: "submenu.membershipLevels", path: "/admin/settings/membership-levels" },
-      { key: "settings-shipping", labelKey: "submenu.shippingRates", path: "/admin/settings/shipping-rates" },
+      { key: "settings-center-settings", labelKey: "submenu.centerSettings", path: "/admin/settings/center-settings" },
       { key: "settings-rates", labelKey: "submenu.rates", path: "/admin/settings/rates" },
       { key: "settings-exchange", labelKey: "submenu.exchangeRates", path: "/admin/settings/exchange-rates" },
       { key: "settings-customs", labelKey: "submenu.customsExchange", path: "/admin/settings/customs-exchange" },
@@ -183,7 +183,7 @@ export const menuItems: MenuItem[] = [
       { key: "settings-purchase", labelKey: "submenu.purchaseConditions", path: "/admin/settings/purchase-conditions" },
       { key: "settings-island", labelKey: "submenu.islandMountainCosts", path: "/admin/settings/island-mountain" },
       { key: "settings-waybill", labelKey: "submenu.waybillBandwidth", path: "/admin/settings/waybill" },
-      { key: "settings-website", labelKey: "submenu.websiteContent", path: "/admin/settings/website-content" },
+      { key: "settings-website", labelKey: "submenu.websiteContent", path: "/admin/settings/website-content" }
     ],
   },
 ];

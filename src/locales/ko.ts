@@ -274,7 +274,7 @@ const ko: Record<string, string> = {
   "orders.status.userRefundProcessing": "사용자환불신청중",
   "orders.status.userRefundComplete": "사용자환불완료",
   "orders.status.platformRefundRequest": "플랫폼환불신청",
-  "orders.status.platformRefundProcessing": "플랫폼환불중",
+  "orders.status.platformRefundProcessing": "플랫폼환불신청중",
   "orders.status.platformRefundComplete": "플랫폼환불신청완료",
   "orders.status.customerReturnProcessing": "고객환불중",
   "orders.status.customerReturnComplete": "고객환불완료",

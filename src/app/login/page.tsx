@@ -16,7 +16,7 @@ export default function LoginPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
+    
     if (!email || !password) {
       setError(t("login.errorEmpty"));
       return;

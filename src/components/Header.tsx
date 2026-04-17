@@ -5,14 +5,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocale, Locale, localeLabels } from "@/contexts/LocaleContext";
 import { notificationItems } from "@/config/menuConfig";
 import {
+  CircleHelp,
   LogOut,
   Menu,
+  MessageSquareText,
+  ReceiptText,
   UserCog,
   Globe,
   ChevronDown,
   Eye,
   EyeOff,
+  Landmark,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
 interface HeaderProps {
@@ -24,6 +29,13 @@ const localeNames: Record<Locale, string> = {
   en: "English",
   ko: "한국어",
   zh: "中文",
+};
+
+const notificationIconByKey: Record<string, LucideIcon> = {
+  deposit: Landmark,
+  bank: ReceiptText,
+  "inquiry-1on1": MessageSquareText,
+  "order-inquiry": CircleHelp,
 };
 
 export default function Header({ onMenuToggle }: HeaderProps) {
@@ -106,17 +118,21 @@ export default function Header({ onMenuToggle }: HeaderProps) {
 
         {/* Notification buttons - each shown individually in header */}
         <div className="hidden lg:flex items-center gap-1">
-          {notificationItems.map((item) => (
-            <button
-              key={item.key}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white  rounded-lg transition-colors whitespace-nowrap"
-            >
-              <span>{t(item.labelKey)}</span>
-              <span className="bg-white/25 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                {item.count}
-              </span>
-            </button>
-          ))}
+          {notificationItems.map((item) => {
+            const Icon = notificationIconByKey[item.key] ?? CircleHelp;
+            return (
+              <button
+                key={item.key}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white rounded-lg transition-colors whitespace-nowrap"
+              >
+                <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                <span>{t(item.labelKey)}</span>
+                <span className="bg-white/25 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                  {item.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Divider */}

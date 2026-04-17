@@ -536,7 +536,7 @@ export default function OrderBoard({
         </form>
 
         {/* ── Toolbar ───────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center justify-between my-3">
           <div className="flex items-center gap-2">
             <select className="h-8 px-3 text-sm border border-gray-300 rounded-md">
               <option value="">{t("orders.action.statusChangeSelect")}</option>
@@ -563,7 +563,7 @@ export default function OrderBoard({
             </button>
           </div>
         </div>
-
+       
         {/* ── Order table ───────────────────────────────────────────── */}
         {/* <div className="mt-4 app-table-wrap">
           <table className="app-table table-fixed"> */}
@@ -578,11 +578,11 @@ export default function OrderBoard({
                   <div>{t("orders.common.applicationType")}</div>
                   <div>{t("orders.common.customsClearance")}</div>
                 </th>
-                <th className="text-center">
+                {/* <th className="text-center">
                   <div>{t("orders.common.productType")}</div>
                   <div>{t("orders.common.shippingMethod")}</div>
                   <div>{t("orders.common.shippingStatus")}</div>
-                </th>
+                </th> */}
                 <th className="text-center">
                   <div>{t("orders.common.membershipCode")}</div>
                   <div>{t("orders.common.receiver")}</div>
@@ -653,13 +653,13 @@ export default function OrderBoard({
                       </span>
                     </td>
                     {/* Type / Method / Status */}
-                    <td className="text-center">
+                    {/* <td className="text-center">
                       <span className="inline-block px-2 py-0.5 text-[11px] font-medium bg-purple-100 text-purple-700 rounded-full">{order.typeLabel}</span>
                       <div className="text-[10px] text-gray-500 mt-0.5">{order.shippingMethod}</div>
                       <span className={`inline-block px-2 py-0.5 text-[10px] rounded-full mt-0.5 ${order.isShipped ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
                         {order.isShipped ? t("orders.common.shipped") : t("orders.common.notShipped")}
                       </span>
-                    </td>
+                    </td> */}
                     {/* Member / Receiver */}
                     <td className="text-center">
                       <span className="inline-block px-2 py-0.5 text-[11px] font-medium bg-amber-100 text-amber-700 rounded-full">{order.memberBadge}</span>
@@ -828,39 +828,42 @@ export default function OrderBoard({
                                     </tr>
                                     <tr className="bg-slate-50/90 ">
                                       <td className="p-0" />
-                                      <td className="p-0" />
-                                      <td colSpan={7} className="align-top px-2 py-2">
+                                    
+                                      <td colSpan={8} className="align-top ">
                                         <div className="flex flex-col gap-1">
-                                          <div className="flex items-center gap-2 justify-around">
-                                            <label className="text-[11px] w-1/6 text-center font-semibold text-gray-700 block mb-0.5">{t("orders.product.productMemo")}</label>
-                                            <input
-                                              type="text"
-                                              defaultValue={lineProductMemo}
-                                              placeholder={t("orders.product.productMemo")}
-                                              className=" h-7 w-4/6 px-2 text-[11px] border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                            />                                            
-                                            <button className="h-7 w-1/6 px-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"> {t("orders.action.register")}</button>
-                                          </div>
-                                          <div className=" flex items-center gap-2 justify-around">
-                                            <label className="text-[11px] w-1/6  text-center font-semibold text-orange-700 block mb-0.5">{t("orders.product.caution")}</label>
-                                            <input
-                                              type="text"
-                                              defaultValue={lineCaution}
-                                              placeholder={t("orders.product.caution")}
-                                              className="w-4/5 h-7 w-4/6 px-2 text-[11px] border border-orange-300 rounded-md bg-white focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
-                                            />
+                                          <div className="flex flex-row gap-2 justify-around">
+                                            <div className="flex items-center gap-2 w-1/2 ">
+                                              <label className="text-[11px] w-1/6 text-center font-semibold text-gray-700 block mb-0.5">{t("orders.product.productMemo")}</label>
+                                              <input
+                                                type="text"
+                                                defaultValue={lineProductMemo}
+                                                placeholder={t("orders.product.productMemo")}
+                                                className=" h-7 w-4/6 px-2 text-[11px] border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                              />                                            
                                               <button className="h-7 w-1/6 px-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"> {t("orders.action.register")}</button>
+                                            </div>
+                                            <div className=" flex items-center gap-2 w-1/2 ">
+                                              <label className="text-[11px] w-1/6  text-center font-semibold text-orange-700 block mb-0.5">{t("orders.product.caution")}</label>
+                                              <input
+                                                type="text"
+                                                defaultValue={lineCaution}
+                                                placeholder={t("orders.product.caution")}
+                                                className=" h-7 w-4/6 px-2 text-[11px] border border-orange-300 rounded-md bg-white focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                                              />
+                                                <button className="h-7 w-1/6 px-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"> {t("orders.action.register")}</button>
+                                             </div>
+                                            
                                           </div>
-                                          <div className="flex items-center gap-2 justify-around">
-                                            <label className="text-[11px] w-1/6 text-center font-semibold text-gray-700 block mb-0.5">{t("orders.product.userMemo")}</label>
-                                            <input
-                                              type="text"
-                                              defaultValue={lineUserMemo}
-                                              placeholder={t("orders.product.userMemo")}
-                                              className="w-4/6 h-7 px-2 text-[11px] border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                            />
-                                            <button className="h-7 w-1/6 px-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"> {t("orders.action.register")}</button>
-                                          </div>
+                                          <div className="flex items-center gap-2 w-1/2 justify-around">
+                                              <label className="text-[11px] w-1/6 text-center font-semibold text-gray-700 block mb-0.5">{t("orders.product.userMemo")}</label>
+                                              <input
+                                                type="text"
+                                                defaultValue={lineUserMemo}
+                                                placeholder={t("orders.product.userMemo")}
+                                                className="h-7 w-4/6 px-2 text-[11px] border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                              />
+                                              <button className="h-7 w-1/6 px-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"> {t("orders.action.register")}</button>
+                                            </div>
                                         </div>
                                       </td>
                                     </tr>

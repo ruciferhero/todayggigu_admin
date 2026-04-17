@@ -178,25 +178,29 @@ function BusinessOutboundReleaseListPanel({ t, locale }: { t: (key: string) => s
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4 items-start">
-        <div className="flex items-center gap-2">
-          <label htmlFor="release-list-center" className="shrink-0 text-sm font-medium text-gray-800">
-            {t("orders.releaseList.centerLabel")}
-          </label>
-          <select
-            id="release-list-center"
-            defaultValue=""
-            className="h-9 min-w-[220px] rounded border border-gray-300 bg-white px-2 text-sm text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="">{t("orders.releaseList.centerPlaceholder")}</option>
-            <option value="Weihai">{t("orders.filter.centerWeihai")}</option>
-            <option value="Qingdao">{t("orders.filter.centerQingdao")}</option>
-            <option value="Guangzhou">{t("orders.filter.centerGuangzhou")}</option>
-          </select>
-        </div>
-        <ReleaseMonthCalendar locale={locale} />
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-gray-900 text-center ">{t("orders.action.outboundList")}</h1>
       </div>
-      <div className="app-table-wrap table-fixed w-full">
+      <div className="flex items-start gap-4">
+        <div className="flex flex-col gap-4 items-center justify-between ">
+          <div className="flex items-center gap-2">
+            <label htmlFor="release-list-center" className="shrink-0 text-sm font-medium text-gray-800">
+              {t("orders.releaseList.centerLabel")}
+            </label>
+            <select
+              id="release-list-center"
+              defaultValue=""
+              className="h-9 min-w-[220px] rounded border border-gray-300 bg-white px-2 text-sm text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">{t("orders.releaseList.centerPlaceholder")}</option>
+              <option value="Weihai">{t("orders.filter.centerWeihai")}</option>
+              <option value="Qingdao">{t("orders.filter.centerQingdao")}</option>
+              <option value="Guangzhou">{t("orders.filter.centerGuangzhou")}</option>
+            </select>
+          </div>
+          <ReleaseMonthCalendar locale={locale} />
+          </div>
+        <div className="app-table-wrap table-fixed w-full">
       <table className="app-table text-xs">
         <thead>
           <tr className="bg-[#f2f2f2]">
@@ -293,7 +297,8 @@ function BusinessOutboundReleaseListPanel({ t, locale }: { t: (key: string) => s
           </tr>
         </tbody>
       </table>
-      </div>
+        </div>
+      </div> 
     </div>
   );
 }
@@ -326,8 +331,8 @@ export default function BusinessOrders() {
         { label: t("orders.status.localDeliveryDelay"), code: "LOCAL_DELAY" },
         { label: t("orders.status.warehouseInProgress"), code: "WH_IN_PROGRESS" },
         { label: t("orders.status.warehouseInComplete"), code: "WH_IN_DONE" },
-        { label: t("orders.status.paymentPending"), code: "PAY_WAIT" },
-        { label: t("orders.status.paymentComplete"), code: "PAY_DONE" },
+        // { label: t("orders.status.paymentPending"), code: "PAY_WAIT" },
+        // { label: t("orders.status.paymentComplete"), code: "PAY_DONE" },
         { label: t("orders.status.shipmentPaymentPending"), code: "SHIP_PAY_WAIT" },
         { label: t("orders.status.shipmentPaymentComplete"), code: "SHIP_PAY_DONE" },
         { label: t("orders.status.shipmentPending"), code: "WH_SHIP_WAIT" },
@@ -343,12 +348,17 @@ export default function BusinessOrders() {
       color: "text-red-500",
       items: [
         { label: t("orders.status.errorWarehouse"), code: "ERR_IN" },
-        { label: t("orders.status.orderCancellation"), code: "ORDER_CANCEL" },
+       // { label: t("orders.status.orderCancellation"), code: "ORDER_CANCEL" },
+        {label: t("orders.status.userRefundRequest"), code: "USER_REFUND_REQ" },
+        {label: t("orders.status.userRefundProcessing"), code: "USER_REFUND_ING" },
+        {label: t("orders.status.userRefundComplete"), code: "USER_REFUND_DONE" },
         { label: t("orders.status.platformRefundRequest"), code: "PLAT_REFUND_REQ" },
         { label: t("orders.status.platformRefundProcessing"), code: "PLAT_REFUND_ING" },
         { label: t("orders.status.platformRefundComplete"), code: "PLAT_REFUND_DONE" },
-        { label: t("orders.status.customerReturnProcessing"), code: "CUSTOMER_RETURN_ING" },
-        { label: t("orders.status.customerReturnComplete"), code: "CUSTOMER_RETURN_DONE" },
+        {label: t("orders.status.finalRefundRequest"), code: "FINAL_REFUND_REQ" },
+        {label: t("orders.status.finalRefundProcessing"), code: "FINAL_REFUND_ING" },
+        {label: t("orders.status.finalRefundComplete"), code: "FINAL_REFUND_DONE" },
+        {label: t("orders.status.orderDisposal"), code: "ORDER_DISPOSAL" },
         { label: t("orders.status.shipmentHold"), code: "HOLD" },
       ],
     },

@@ -39,6 +39,7 @@ export default function ShippingAgencyOrders() {
       color: "text-red-500",
       items: [
         { label: t("orders.status.errorWarehouse"), code: "ERR_IN" },
+        { label: t("orders.status.shipmentHold"), code: "DEL_SHIP_HOLD" }
       ],
     },
     {

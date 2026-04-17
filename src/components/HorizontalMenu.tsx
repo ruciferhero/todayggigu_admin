@@ -3,8 +3,46 @@
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import {
+  BarChart3,
+  Bell,
+  Boxes,
+  Building2,
+  Cog,
+  CreditCard,
+  Gift,
+  House,
+  LifeBuoy,
+  Package,
+  PackageSearch,
+  Settings2,
+  ShoppingCart,
+  Smartphone,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { menuItems, MenuItem } from "@/config/menuConfig";
 import { useLocale } from "@/contexts/LocaleContext";
+
+const topMenuIconByKey: Record<string, LucideIcon> = {
+  "business-orders": ShoppingCart,
+  "rocket-orders": Package,
+  "vvic-orders": PackageSearch,
+  "payment-agency": CreditCard,
+  "shipping-agency": Boxes,
+  "trade-services": Building2,
+  products: Package,
+  members: Users,
+  cs: LifeBuoy,
+  homepage: House,
+  settlement: Wallet,
+  coupons: Gift,
+  sms: Smartphone,
+  statistics: BarChart3,
+  rack: Bell,
+  settings: Settings2,
+};
 
 export default function HorizontalMenu() {
   const pathname = usePathname();
@@ -60,23 +98,29 @@ export default function HorizontalMenu() {
       {/* Level 1: Main menu items - horizontal line */}
       <nav className="flex items-center px-4 overflow-x-auto">
         {menuItems.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onMouseEnter={() => setHoveredTopKey(item.key)}
-            onClick={() => {
-              setActiveMenu(activeMenu === item.key ? null : item.key);
-              setActiveSubmenu(null);
-              setHoveredTopKey(null);
-            }}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-              activeMenu === item.key
-                ? "text-blue-600 border-blue-600"
-                : "text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300"
-            }`}
-          >
-            {t(item.labelKey)}
-          </button>
+          (() => {
+            const Icon = topMenuIconByKey[item.key] ?? Cog;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onMouseEnter={() => setHoveredTopKey(item.key)}
+                onClick={() => {
+                  setActiveMenu(activeMenu === item.key ? null : item.key);
+                  setActiveSubmenu(null);
+                  setHoveredTopKey(null);
+                }}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex flex-col items-center justify-center gap-1 ${
+                  activeMenu === item.key
+                    ? "text-blue-600 border-blue-600"
+                    : "text-gray-600 border-transparent hover:text-yellow-600 hover:border-yellow-600"
+                }`}
+              >
+                <Icon className="h-4 w-4" aria-hidden />
+                <span>{t(item.labelKey)}</span>
+              </button>
+            );
+          })()
         ))}
       </nav>
 
@@ -96,7 +140,7 @@ export default function HorizontalMenu() {
                   className={`px-4 py-2.5 text-sm whitespace-nowrap transition-colors border-b-2 ${
                     pathname === child.path
                       ? "text-blue-600 border-blue-600 font-medium"
-                      : "text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300"
+                      : "text-gray-600 border-transparent hover:text-yellow-900 hover:border-yellow-300"
                   }`}
                 >
                   {t(child.labelKey)}
@@ -116,7 +160,7 @@ export default function HorizontalMenu() {
                     (!hoveredTopKey || hoveredTopKey === activeMenu) &&
                     (activeSubmenu === child.key || isActive(child))
                       ? "text-blue-600 border-blue-600 font-medium"
-                      : "text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300"
+                      : "text-gray-600 border-transparent hover:text-yellow-900 hover:border-yellow-300"
                   }`}
                 >
                   {t(child.labelKey)}
@@ -138,7 +182,7 @@ export default function HorizontalMenu() {
                 className={`px-4 py-2 text-sm whitespace-nowrap transition-colors border-b-2 ${
                   pathname === sub.path
                     ? "text-blue-600 border-blue-600 font-medium"
-                    : "text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300"
+                    : "text-gray-500 border-transparent hover:text-yellow-900 hover:border-yellow-300"
                 }`}
               >
                 {t(sub.labelKey)}

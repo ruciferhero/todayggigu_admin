@@ -346,7 +346,7 @@ export default function CenterSettings() {
   ];
 
   return (
-    <div className="min-h-screen space-y-4 bg-white p-6">
+    <div className="space-y-4 bg-white p-6">
       <header className="px-2">
         <h1 className="text-xl font-semibold">{t("submenu.centerSettings")}</h1>
       </header>

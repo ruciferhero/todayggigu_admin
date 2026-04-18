@@ -1,63 +1,98 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import * as authApi from "@/api/auth";
+import type { AuthUser } from "@/api/auth";
+import {
+  ApiError,
+  getToken,
+  setToken,
+  setRefreshToken,
+} from "@/api/client";
 
-interface User {
-  email: string;
-  name: string;
-}
+export type LoginResult = { ok: true } | { ok: false; message: string };
 
 interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+  user: AuthUser | null;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const DEFAULT_USER = {
-  email: "todayggigu@admin.com",
-  password: "todayggigu",
-  name: "Admin",
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    setMounted(true);
-    const stored = localStorage.getItem("todayggigu_user");
-    if (stored) {
-      setUser(JSON.parse(stored));
+    if (pathname === "/login") {
+      setIsLoading(false);
+      return;
     }
+    if (!getToken()) {
+      setIsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await authApi.fetchMe();
+        if (!cancelled) setUser(me);
+      } catch {
+        if (!cancelled) {
+          setToken(null);
+          setRefreshToken(null);
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = (email: string, password: string): boolean => {
-    if (email === DEFAULT_USER.email && password === DEFAULT_USER.password) {
-      const userData = { email, name: DEFAULT_USER.name };
-      setUser(userData);
-      localStorage.setItem("todayggigu_user", JSON.stringify(userData));
-      return true;
+  const login: AuthContextType["login"] = async (email, password) => {
+    try {
+      const result = await authApi.login({ email, password });
+      setToken(result.token);
+      setRefreshToken(result.refreshToken || null);
+      setUser(result.user);
+      return { ok: true };
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Network error";
+      return { ok: false, message };
     }
-    return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await authApi.logout();
+    setToken(null);
+    setRefreshToken(null);
     setUser(null);
-    localStorage.removeItem("todayggigu_user");
     router.push("/login");
   };
 
-  if (!mounted) {
+  if (isLoading) {
     return null;
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider
+      value={{ user, login, logout, isAuthenticated: !!user, isLoading }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -9,24 +9,29 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const { t } = useLocale();
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    
+
     if (!email || !password) {
       setError(t("login.errorEmpty"));
       return;
     }
 
-    const success = login(email, password);
-    if (success) {
+    setSubmitting(true);
+    const result = await login(email, password);
+    setSubmitting(false);
+
+    if (result.ok) {
       router.push("/admin/orders/business");
+      
     } else {
-      setError(t("login.errorInvalid"));
+      setError(result.message || t("login.errorInvalid"));
     }
   };
 
@@ -81,7 +86,8 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors cursor-pointer"
+              disabled={submitting}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors cursor-pointer"
             >
               {t("login.button")}
             </button>

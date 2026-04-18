@@ -24,7 +24,7 @@ const CenterManagement: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<Center | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Center | null>(null);
   const [formData, setFormData] = useState({
-    nation: "", centerName: "", centerCode: "", postalCode: "", city: "", state: "",
+    nation: "", centerName: "", centerCode: "", alCode: "", city: "", state: "",
     address1: "", address2: "", phoneNumber: "", weightUnit: "", transportationMethods: [] as string[],
     whetherToUse: "use", briefSummary: "",
   });
@@ -40,14 +40,14 @@ const CenterManagement: React.FC = () => {
 
   const sampleData: Center[] = [
     { id: "1", nation: "Republic of Korea (1)", center: "Incheon (4)", centerCode: "ICN", unitOfMeasurement: "kg", transportationMethod: "Haeun Incheon and Incheon CJ, Haeun LCL, Rocket LCL...", address: "MCI Logistics, Seogu, Pyeongtaek-si", phoneNumber: "070-4179-9683", shippingCenter: "Anhui Center", whetherToUse: "use" },
-    { id: "2", nation: "China (2)", center: "For (5)", centerCode: "WH", unitOfMeasurement: "kg", transportationMethod: "Haeun Incheon (Post Office)...", address: "MICS Yiwu-si 240", phoneNumber: "180-7888-2982", shippingCenter: "Shipping Center", whetherToUse: "use" },
+    { id: "2", nation: "China (2)", center: "For (5)", centerCode: "WH", unitOfMeasurement: "kg", transportationMethod: "Haeun Incheon ( Office)...", address: "MICS Yiwu-si 240", phoneNumber: "180-7888-2982", shippingCenter: "Shipping Center", whetherToUse: "use" },
     { id: "3", nation: "China (3)", center: "Cheongdo (7)", centerCode: "QD", unitOfMeasurement: "kg", transportationMethod: "Air express, Incheon (CJ)...", address: "\uCCAD\uB3C4 \uD3C9\uB3C4\uAD6C", phoneNumber: "177-6476-1070", shippingCenter: "Shipping Center", whetherToUse: "Not in use" },
     { id: "4", nation: "China (4)", center: "Guangzhou (8)", centerCode: "GZ", unitOfMeasurement: "kg", transportationMethod: "Haeun Incheon (CJ)...", address: "\uAD11\uC800\uC6B0 / \uD558\uC774\uC8FC\uAD6C", phoneNumber: "180-2752-7541", shippingCenter: "Shipping Center", whetherToUse: "use" },
     { id: "5", nation: "China (5)", center: "Lee Woo (12)", centerCode: "YW", unitOfMeasurement: "kg", transportationMethod: "Haeun LCL, Rocket LCL...", address: "\uC774\uC6B0\uC2DC 1\uCE35", phoneNumber: "180-6791-7903", shippingCenter: "Shipping Center", whetherToUse: "use" },
   ];
 
   const transportOptions = [
-    "Haeun Incheon (CJ)", "Haeun Incheon (Post Office)", "Incheon Marine & Aerospace (Hanjin)",
+    "Haeun Incheon (CJ)", "Haeun Incheon ( Office)", "Incheon Marine & Aerospace (Hanjin)",
     "Haeun Pyeongtaek (CJ)", "Haeun Pyeongtaek (Hanjin)", "Shipping business operator",
     "LCL (Mon/Wed/Fri cargo ship)", "LCL (Tuesday/Thursday/Sunday ferry)", "Aviation",
     "Air express", "EMS Shipping", "EMS Airlines", "airline operators",
@@ -58,7 +58,7 @@ const CenterManagement: React.FC = () => {
 
   const handleRegister = () => {
     setEditingRecord(null);
-    setFormData({ nation: "", centerName: "", centerCode: "", postalCode: "", city: "", state: "", address1: "", address2: "", phoneNumber: "", weightUnit: "", transportationMethods: [], whetherToUse: "use", briefSummary: "" });
+    setFormData({ nation: "", centerName: "", centerCode: "", alCode: "", city: "", state: "", address1: "", address2: "", phoneNumber: "", weightUnit: "", transportationMethods: [], whetherToUse: "use", briefSummary: "" });
     setRegisterModalVisible(true);
   };
 
@@ -167,8 +167,8 @@ const CenterManagement: React.FC = () => {
                   <input value={formData.centerCode} onChange={(e) => setFormData({ ...formData, centerCode: e.target.value })} placeholder="ex) English capital letters" className="border rounded-md px-3 py-2 text-sm" />
                 </div>
                 <div className="grid grid-cols-[140px_1fr] items-center gap-2">
-                  <label className="text-sm font-medium text-right">{t("settings.center.modal.postalCode")}</label>
-                  <input value={formData.postalCode} onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })} className="border rounded-md px-3 py-2 text-sm" />
+                  <label className="text-sm font-medium text-right">{t("settings.center.modal.de")}</label>
+                  <input value={formData.alCode} onChange={(e) => setFormData({ ...formData, alCode: e.target.value })} className="border rounded-md px-3 py-2 text-sm" />
                 </div>
                 <div className="grid grid-cols-[140px_1fr] items-center gap-2">
                   <label className="text-sm font-medium text-right">{t("settings.center.modal.city")}</label>

@@ -1,16 +1,28 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   ChevronDown, ChevronUp, Download, Eye, History, Minus, Plus,
   RotateCcw, Save, Search, Upload, X,
 } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
+import { fetchManualOrderProgressCountsOnly, fetchManualOrdersSearch } from "@/api/orders/manualSearch";
+import {
+  getProgressSelectOptionsForOrder,
+  resolveProgressSelectValue,
+} from "./orderBoardProgressColumnOptions";
+import { buildOrderViewWindowHtml, type OrderViewWindowLabels } from "./orderViewWindowDocument";
+import { buildOrderLogWindowHtml, type OrderLogWindowLabels } from "./orderLogWindowDocument";
 
 /* ─── Public types ──────────────────────────────────────────────────────── */
 
-export interface OrderBoardStatusItem { label: string; code: string }
+export interface OrderBoardStatusItem {
+  label: string;
+  code: string;
+  /** Query value for `GET /orders/manual/search?progressStatus=` when using manual search API */
+  progressStatusParam?: string;
+}
 export interface OrderBoardStatusGroup { title: string; icon: React.ReactNode; color: string; items: OrderBoardStatusItem[] }
 
 export interface OrderBoardProduct {
@@ -80,6 +92,11 @@ interface Props {
   purchaseAgencyRowActions?: boolean;
   /** 설정 시 필터·툴바·주문 테이블·페이지네이션 대신 이 콘텐츠만 표시 */
   mainPanelOverride?: React.ReactNode;
+  /**
+   * `manualSearchApi`: 주문·상태 카운트를 `GET /orders/manual/search`로 불러옵니다.
+   * `orders`는 폴백·창고 셀렉트 옵션용으로만 쓰이며, 테이블 데이터는 API 결과를 사용합니다.
+   */
+  ordersDataSource?: "props" | "manualSearchApi";
 }
 
 /** i18n keys for purchase-agency row actions (first three are always shown). */
@@ -143,8 +160,6 @@ function rowActionButtonClass(labelKey: string): string {
 const ORDER_BOARD_COL_SUM_UNITS = 11.5;
 const ORDER_BOARD_DATA_COL_W = `calc(100% / ${ORDER_BOARD_COL_SUM_UNITS})`;
 const ORDER_BOARD_ACTION_COL_W = `calc(100% * 1.5 / ${ORDER_BOARD_COL_SUM_UNITS})`;
-
-const ORDER_PRODUCT_CHECK_COL_PX = 40;
 
 /** Panel filter values applied on "Search" (draft mirrors inputs until then). */
 interface OrderBoardSearchFilters {
@@ -224,14 +239,178 @@ function applyOrderBoardSearchFilters(
   return out;
 }
 
+function hasActivePanelFilters(f: OrderBoardSearchFilters): boolean {
+  return Object.values(f).some((v) => String(v).trim() !== "");
+}
+
+function OrderBoardProgressSelectCell({
+  order,
+  flatStatusItems,
+  t,
+  progressSelectByOrder,
+  setProgressSelectByOrder,
+}: {
+  order: OrderBoardOrder;
+  flatStatusItems: OrderBoardStatusItem[];
+  t: (key: string) => string;
+  progressSelectByOrder: Record<string, string>;
+  setProgressSelectByOrder: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}) {
+  const progressOptions = getProgressSelectOptionsForOrder(order.statusCode, flatStatusItems);
+  const progressValue = resolveProgressSelectValue(
+    order.orderNo,
+    order.statusCode,
+    progressOptions,
+    progressSelectByOrder,
+  );
+  return (
+    <select
+      className="mx-auto block w-full max-w-[10rem] text-[10px] leading-snug border border-gray-300 rounded-md py-1 px-1 bg-white text-gray-800"
+      aria-label={t("orders.common.progressStatus")}
+      value={progressValue}
+      onChange={(e) =>
+        setProgressSelectByOrder((prev) => ({
+          ...prev,
+          [order.orderNo]: e.target.value,
+        }))
+      }
+    >
+      {!progressOptions.some((s) => s.code === order.statusCode) &&
+        order.statusCode &&
+        (order.progressStatus || order.statusCode) && (
+          <option value={order.statusCode}>{order.progressStatus || order.statusCode}</option>
+        )}
+      {progressOptions.map((s) => (
+        <option key={s.code} value={s.code}>
+          {s.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /* ─── Component ─────────────────────────────────────────────────────────── */
 
 export default function OrderBoard({
   title, defaultSelectedLabel, memberFilterLabel, memberFilterPlaceholder,
   statusGroups, orders, actionButtons, purchaseAgencyRowActions = false,
   mainPanelOverride,
+  ordersDataSource = "props",
 }: Props) {
   const { t } = useLocale();
+
+  const openOrderViewWindow = (order: OrderBoardOrder) => {
+    const win = window.open("", "_blank");
+    if (!win) return;
+
+    const labels: OrderViewWindowLabels = {
+      none: t("orders.common.none"),
+      won: t("orders.common.won"),
+      close: t("orders.common.close"),
+      orderMemo: t("orders.expanded.orderMemo"),
+      orderMemoPlaceholder: t("orders.expanded.orderMemoPlaceholder"),
+      register: t("orders.action.register"),
+      orderInquiry: t("orders.action.orderInquiry"),
+      shippingCenterSection: t("orders.viewWindow.shippingCenterSection"),
+      orderShipperMailbox: t("orders.viewWindow.orderShipperMailbox"),
+      progressReceipt: t("orders.viewWindow.progressReceipt"),
+      applicationCenterRow: t("orders.viewWindow.applicationCenterRow"),
+      trackingRow: t("orders.viewWindow.trackingRow"),
+      shippingMethod: t("orders.common.shippingMethod"),
+      customsClearance: t("orders.common.customsClearance"),
+      depositAutoPay: t("orders.viewWindow.depositAutoPay"),
+      productInfoTitle: t("orders.viewWindow.productInfoTitle"),
+      selectAll: t("orders.viewWindow.selectAll"),
+      saveOrderMemo: t("orders.viewWindow.saveOrderMemo"),
+      additionalServices: t("orders.viewWindow.additionalServices"),
+      registeredCoupon: t("orders.viewWindow.registeredCoupon"),
+      changeAdditionalServices: t("orders.viewWindow.changeAdditionalServices"),
+      recipientSection: t("orders.viewWindow.recipientSection"),
+      nameOrCompany: t("orders.viewWindow.nameOrCompany"),
+      addressContact: t("orders.viewWindow.addressContact"),
+      bizRegAddress: t("orders.viewWindow.bizRegAddress"),
+      deliveryRequest: t("orders.viewWindow.deliveryRequest"),
+      centerRequest: t("orders.viewWindow.centerRequest"),
+      changeRecipientAddress: t("orders.viewWindow.changeRecipientAddress"),
+      orderInquirySection: t("orders.viewWindow.orderInquirySection"),
+      inquiryPlaceholder: t("orders.viewWindow.inquiryPlaceholder"),
+      stubSaved: t("orders.viewWindow.stubSaved"),
+      stubComingSoon: t("orders.viewWindow.stubComingSoon"),
+      edit: t("orders.viewWindow.edit"),
+      copy: t("orders.viewWindow.copy"),
+      add: t("orders.viewWindow.add"),
+      delete: t("orders.viewWindow.delete"),
+      trackingSave: t("orders.viewWindow.trackingSave"),
+      orderNoSave: t("orders.viewWindow.orderNoSave"),
+      productNumber: t("orders.product.productNumber"),
+      image: t("orders.product.image"),
+      nameOptions: t("orders.product.nameOptions"),
+      trackingNoColon: t("orders.product.trackingNoColon"),
+      orderNoLink: t("orders.product.orderNoLink"),
+      unitQtyPriceLine1: t("orders.product.unitQtyPriceLine1"),
+      unitQtyPriceLine2: t("orders.product.unitQtyPriceLine2"),
+      shippingLine1: t("orders.product.shippingLine1"),
+      shippingLine2: t("orders.product.shippingLine2"),
+      rackHeaderLine1: t("orders.product.rackHeaderLine1"),
+      rackHeaderLine2: t("orders.product.rackHeaderLine2"),
+      productStatus: t("orders.product.productStatus"),
+      trackingInput: t("orders.product.trackingInput"),
+      batchSave: t("orders.product.batchSave"),
+      addAdditionalService: t("orders.product.addAdditionalService"),
+      productLog: t("orders.product.productLog"),
+      packingSplit: t("orders.action.packingSplit"),
+      labelPrint: t("orders.product.labelPrint"),
+      actualPhoto: t("orders.product.actualPhoto"),
+      rackNoColon: t("orders.product.rackNoColon"),
+      rackNoPlaceholder: t("orders.product.rackNoPlaceholder"),
+      rackSave: t("orders.product.rackSave"),
+      prevRackColon: t("orders.product.prevRackColon"),
+      productMemo: t("orders.product.productMemo"),
+      caution: t("orders.product.caution"),
+      userMemo: t("orders.product.userMemo"),
+      statusInbound: t("orders.product.statusInbound"),
+      statusInboundDone: t("orders.product.statusInboundDone"),
+      statusShipWait: t("orders.product.statusShipWait"),
+      workPending: t("orders.inboundScan.workPending"),
+      labelUnconfirmed: t("orders.product.labelUnconfirmed"),
+      issueProduct: t("orders.action.issueProduct"),
+      trackingFilterPlaceholder: t("orders.filter.trackingNoPlaceholder"),
+    };
+
+    win.document.write(buildOrderViewWindowHtml(order, labels));
+    win.document.close();
+  };
+
+  const openOrderLogWindow = (order: OrderBoardOrder) => {
+    const win = window.open("", "_blank");
+    if (!win) return;
+
+    const logLabels: OrderLogWindowLabels = {
+      pageTitle: `${t("orders.viewLog.pageTitle")} - ${order.orderNo}`,
+      headerTitle: t("orders.viewLog.headerTitle").replace("{{no}}", order.orderNo),
+      colNo: t("orders.viewLog.colNo"),
+      colWorker: t("orders.viewLog.colWorker"),
+      colContent: t("orders.viewLog.colContent"),
+      colRegisteredAt: t("orders.viewLog.colRegisteredAt"),
+      close: t("orders.common.close"),
+      entryOrderApply: t("orders.viewLog.entryOrderApply"),
+      entryOrderUpdated: t("orders.viewLog.entryOrderUpdated"),
+      entryProgressChange: t("orders.viewLog.entryProgressChange"),
+      detailTotalQty: t("orders.viewLog.detailTotalQty"),
+      detailTotalAmount: t("orders.viewLog.detailTotalAmount"),
+      detailTrackingCount: t("orders.viewLog.detailTrackingCount"),
+      detailCouponNo: t("orders.viewLog.detailCouponNo"),
+      workerSystem: t("orders.viewLog.workerSystem"),
+      none: t("orders.common.none"),
+      won: t("orders.common.won"),
+      itemsSuffix: t("orders.common.items"),
+      lineUpdatedBody: t("orders.board.logLineUpdated"),
+      progressLabel: t("orders.board.logLineStatus"),
+    };
+
+    win.document.write(buildOrderLogWindowHtml(order, logLabels));
+    win.document.close();
+  };
 
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [selectedLabel, setSelectedLabel] = useState(defaultSelectedLabel);
@@ -243,38 +422,172 @@ export default function OrderBoard({
   const [pageSize, setPageSize] = useState(50);
   const [filterDraft, setFilterDraft] = useState<OrderBoardSearchFilters>(emptyOrderBoardSearchFilters);
   const [filterApplied, setFilterApplied] = useState<OrderBoardSearchFilters>(emptyOrderBoardSearchFilters);
-  const [orderColumnModal, setOrderColumnModal] = useState<
-    { mode: "view" | "log"; order: OrderBoardOrder } | null
-  >(null);
   const [inboundScanOpen, setInboundScanOpen] = useState(false);
+  /** Row-local 입고상태 / 진행상태 select 값 (서버 반영 전 UI만) */
+  const [warehouseSelectByOrder, setWarehouseSelectByOrder] = useState<Record<string, string>>({});
+  const [progressSelectByOrder, setProgressSelectByOrder] = useState<Record<string, string>>({});
+  const [apiRows, setApiRows] = useState<OrderBoardOrder[]>([]);
+  const [apiProgressCounts, setApiProgressCounts] = useState<Map<string, number>>(new Map());
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiTotalPages, setApiTotalPages] = useState(1);
+  /** Total rows matching current server query (for header/footer when not using panel filters). */
+  const [apiMatchTotal, setApiMatchTotal] = useState<number | null>(null);
+  const apiExpandInit = useRef(false);
 
   /* derived */
-  const statusCounts = useMemo(() => {
+  const flatStatusItems = useMemo(() => statusGroups.flatMap((g) => g.items), [statusGroups]);
+
+  const progressQueryParam = useMemo(() => {
+    if (!selectedCode) return undefined;
+    for (const g of statusGroups) {
+      const hit = g.items.find((x) => x.code === selectedCode);
+      if (hit) return hit.progressStatusParam ?? hit.code;
+    }
+    return selectedCode;
+  }, [selectedCode, statusGroups]);
+
+  const baseOrders = ordersDataSource === "manualSearchApi" ? apiRows : orders;
+
+  useEffect(() => {
+    apiExpandInit.current = false;
+  }, [selectedCode]);
+
+  /** Counts only come from `GET /orders/manual/search` with no query params (backend contract). */
+  useEffect(() => {
+    if (ordersDataSource !== "manualSearchApi") return;
+    let cancelled = false;
+    fetchManualOrderProgressCountsOnly(t)
+      .then((counts) => {
+        if (!cancelled) setApiProgressCounts(counts);
+      })
+      .catch(() => {
+        /* keep previous counts */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ordersDataSource, t]);
+
+  useEffect(() => {
+    if (ordersDataSource !== "manualSearchApi") {
+      setApiRows([]);
+      setApiProgressCounts(new Map());
+      setApiMatchTotal(null);
+      setApiLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setApiLoading(true);
+    fetchManualOrdersSearch(
+      { progressStatus: progressQueryParam, page: currentPage, pageSize },
+      t,
+    )
+      .then((res) => {
+        if (cancelled) return;
+        setApiRows(res.orders);
+        setApiTotalPages(res.pagination.totalPages);
+        const matchTotal =
+          res.pagination.total > 0
+            ? res.pagination.total
+            : res.totalOrders > 0
+              ? res.totalOrders
+              : res.orders.length;
+        setApiMatchTotal(matchTotal);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setApiRows([]);
+          setApiMatchTotal(null);
+          setApiTotalPages(1);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setApiLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ordersDataSource, progressQueryParam, currentPage, pageSize, t]);
+
+  useEffect(() => {
+    if (ordersDataSource !== "manualSearchApi" || apiExpandInit.current || apiRows.length === 0) return;
+    apiExpandInit.current = true;
+    setExpandedProducts(new Set([apiRows[0].orderNo]));
+  }, [ordersDataSource, apiRows]);
+
+  const warehouseSelectOptions = useMemo(
+    () => [
+      t("orders.status.warehouseInProgress"),
+      t("orders.status.warehouseInComplete"),
+      t("orders.filter.warehouseStatusExpected"),
+      t("orders.filter.warehouseStatusPartial"),
+      t("orders.filter.warehouseStatusDone"),
+    ],
+    [t],
+  );
+
+  const warehouseSelectChoices = useMemo(() => {
+    const set = new Set(warehouseSelectOptions);
+    for (const o of baseOrders) {
+      if (o.warehouseStatus) set.add(o.warehouseStatus);
+    }
+    return [...set];
+  }, [warehouseSelectOptions, baseOrders]);
+
+  const localStatusCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const o of orders) counts.set(o.statusCode, (counts.get(o.statusCode) ?? 0) + 1);
     return counts;
   }, [orders]);
 
-  const filteredOrders = useMemo(() => {
-    const byStatus = selectedCode
-      ? orders.filter((o) => o.statusCode === selectedCode)
-      : orders;
-    return applyOrderBoardSearchFilters(byStatus, filterApplied, t);
-  }, [orders, selectedCode, filterApplied, t]);
+  const statusCounts = useMemo(() => {
+    if (ordersDataSource !== "manualSearchApi") return localStatusCounts;
+    const m = new Map<string, number>();
+    for (const item of flatStatusItems) {
+      const key = item.progressStatusParam ?? item.code;
+      m.set(item.code, apiProgressCounts.get(key) ?? 0);
+    }
+    return m;
+  }, [ordersDataSource, flatStatusItems, apiProgressCounts, localStatusCounts]);
 
-  const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const filteredOrders = useMemo(() => {
+    const serverFiltered =
+      ordersDataSource === "manualSearchApi" && progressQueryParam !== undefined;
+    const byStatus =
+      !serverFiltered && selectedCode
+        ? baseOrders.filter((o) => o.statusCode === selectedCode)
+        : baseOrders;
+    return applyOrderBoardSearchFilters(byStatus, filterApplied, t);
+  }, [baseOrders, selectedCode, filterApplied, t, ordersDataSource, progressQueryParam]);
+
+  const panelFiltered = hasActivePanelFilters(filterApplied);
+  const totalPages = useMemo(() => {
+    if (ordersDataSource === "manualSearchApi" && !panelFiltered) {
+      return Math.max(1, apiTotalPages);
+    }
+    return Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  }, [ordersDataSource, panelFiltered, apiTotalPages, filteredOrders.length, pageSize]);
+
+  const paginatedOrders = useMemo(() => {
+    if (ordersDataSource === "manualSearchApi" && !panelFiltered) {
+      return filteredOrders;
+    }
+    return filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [ordersDataSource, panelFiltered, filteredOrders, currentPage, pageSize]);
+
+  const displayOrderCount = useMemo(() => {
+    if (ordersDataSource === "manualSearchApi" && !panelFiltered && apiMatchTotal != null) {
+      return apiMatchTotal;
+    }
+    return filteredOrders.length;
+  }, [ordersDataSource, panelFiltered, apiMatchTotal, filteredOrders.length]);
 
   const inboundScanContext = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    const o = filteredOrders[start] ?? filteredOrders[0];
+    const o = paginatedOrders[0];
     const p = o?.products[0];
     if (!o || !p) return null;
     return { order: o, product: p };
-  }, [filteredOrders, currentPage, pageSize]);
+  }, [paginatedOrders]);
 
   /* helpers */
   const toggle = (orderNo: string) =>
@@ -317,7 +630,7 @@ export default function OrderBoard({
             }`}
           >
             {selectedLabel} (
-            {filteredOrders.length.toLocaleString()}
+            {displayOrderCount.toLocaleString()}
             {t("orders.common.count")})
           </span>
         </div>
@@ -567,15 +880,19 @@ export default function OrderBoard({
         {/* ── Order table ───────────────────────────────────────────── */}
         {/* <div className="mt-4 app-table-wrap">
           <table className="app-table table-fixed"> */}
-        <div className="app-table-wrap table-fixed w-full">
+        <div
+          className={`app-table-wrap table-fixed w-full relative ${
+            ordersDataSource === "manualSearchApi" && apiLoading ? "opacity-50" : ""
+          }`}
+        >
         
           <table className="app-table text-xs">
             <thead>
               <tr className="bg-gray-500">
                 <th className="text-center w-3/22">{t("orders.common.orderNumber")}</th>
                 <th className="text-center">
-                  <div>{t("orders.common.center")}</div>
                   <div>{t("orders.common.applicationType")}</div>
+                  <div>{t("orders.common.shippingMethod")}</div>
                   <div>{t("orders.common.customsClearance")}</div>
                 </th>
                 {/* <th className="text-center">
@@ -597,10 +914,9 @@ export default function OrderBoard({
                 </th>
                 <th className="text-center">
                   <div>{t("orders.common.trackingNumber")}</div>
-                  <div>{t("orders.common.shipDate")}/{t("orders.common.rackNumber")}</div>
+                  <div>{t("orders.common.rackNumber")}</div>
                 </th>
                 <th className="text-center">
-                  <div>{t("orders.common.warehouseStatus")}</div>
                   <div>{t("orders.common.progressStatus")}</div>
                 </th>
                 <th className="text-center">
@@ -629,14 +945,14 @@ export default function OrderBoard({
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            onClick={() => setOrderColumnModal({ mode: "view", order })}
+                            onClick={() => openOrderViewWindow(order)}
                             className="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5"
                           >
                             <Eye className="w-3 h-3" />{t("orders.action.viewOrder")}
                           </button>
                           <button
                             type="button"
-                            onClick={() => setOrderColumnModal({ mode: "log", order })}
+                            onClick={() => openOrderLogWindow(order)}
                             className="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5"
                           >
                             <History className="w-3 h-3" />{t("orders.action.log")}
@@ -686,9 +1002,14 @@ export default function OrderBoard({
                       <div className="text-[10px] text-gray-500 mt-0.5">{order.shipDate} · {order.rack}</div>
                     </td>
                     {/* Warehouse / Progress */}
-                    <td className="text-center">
-                      <span className="inline-block px-2 py-0.5 text-[11px] bg-green-100 text-green-700 rounded-full mb-1">{order.warehouseStatus}</span>
-                      <div className="text-[11px] text-gray-600">{order.progressStatus}</div>
+                    <td className="text-center px-1 align-middle">
+                      <OrderBoardProgressSelectCell
+                        order={order}
+                        flatStatusItems={flatStatusItems}
+                        t={t}
+                        progressSelectByOrder={progressSelectByOrder}
+                        setProgressSelectByOrder={setProgressSelectByOrder}
+                      />
                     </td>
                     {/* Created / Updated */}
                     <td className="text-center">
@@ -729,7 +1050,7 @@ export default function OrderBoard({
                   {expandedProducts.has(order.orderNo) && (
                     <tr className="border-b border-slate-200 bg-slate-50/90 transition-colors duration-150 hover:bg-slate-100">
                       <td colSpan={1}></td>
-                      <td colSpan={10} className="px-6 py-4 ">
+                      <td colSpan={8} className="px-6 py-4 ">
                         {/* Admin memo */}
                         <div className="flex items-center gap-2 text-xs mb-3">
                           <span className="font-bold min-w-[100px]">{t("orders.expanded.orderMemo")}:</span>
@@ -758,112 +1079,250 @@ export default function OrderBoard({
                           </div>
                         </div>
 
-                        {/* Product table */}
+                        {/* Product table (8 columns — reference layout) */}
                         <div className="app-table-wrap">
-                          <table className="app-table app-table-compact table-fixed">
+                          <table className="app-table app-table-compact table-fixed w-full border border-gray-300">
                             <colgroup>
-                              <col style={{ width: ORDER_PRODUCT_CHECK_COL_PX }} />
                               {Array.from({ length: 8 }, (_, i) => (
-                                <col
-                                  key={i}
-                                  style={{
-                                    width: `calc((100% - ${ORDER_PRODUCT_CHECK_COL_PX}px) / 8)`,
-                                  }}
-                                />
+                                <col key={i} style={{ width: `${100 / 8}%` }} />
                               ))}
                             </colgroup>
                             <thead>
-                              <tr>
-                                <th className="text-center">
-                                  <input type="checkbox" className="rounded border-gray-300" />
+                              <tr className="bg-gray-500 text-white">
+                                <th className="text-center text-[11px] font-semibold px-1 py-2 align-middle">
+                                  {t("orders.product.productNumber")}
                                 </th>
-                                <th className="text-left">{t("orders.product.productNumber")}</th>
-                                <th className="text-left">{t("orders.product.image")}</th>
-                                <th className="text-left">{t("orders.product.nameOptions")}</th>
-                                <th className="text-left">{t("orders.product.trackingOrderNo")}</th>
-                                <th className="text-right">{t("orders.product.unitQtyPrice")}</th>
-                                <th className="text-right">{t("orders.product.shippingCosts")}</th>
-                                <th className="text-left">{t("orders.product.rackPrevRack")}</th>
-                                <th className="text-left">{t("orders.product.productStatus")}</th>
+                                <th className="text-center text-[11px] font-semibold px-1 py-2 align-middle">
+                                  {t("orders.product.image")}
+                                </th>
+                                <th className="text-left text-[11px] font-semibold px-1 py-2 align-middle">
+                                  {t("orders.product.nameOptions")}
+                                </th>
+                                <th className="text-center text-[11px] font-semibold px-1 py-2 align-middle">
+                                  <div>{t("orders.product.trackingNoColon")}</div>
+                                  <div className="text-[10px] font-normal opacity-95">{t("orders.product.orderNoLink")}</div>
+                                </th>
+                                <th className="text-center text-[11px] font-semibold px-1 py-2 align-middle">
+                                  <div>{t("orders.product.unitQtyPriceLine1")}</div>
+                                  <div className="text-[10px] font-normal opacity-95">{t("orders.product.unitQtyPriceLine2")}</div>
+                                </th>
+                                <th className="text-center text-[11px] font-semibold px-1 py-2 align-middle">
+                                  <div>{t("orders.product.shippingLine1")}</div>
+                                  <div className="text-[10px] font-normal opacity-95">{t("orders.product.shippingLine2")}</div>
+                                </th>
+                                <th className="text-center text-[11px] font-semibold px-1 py-2 align-middle">
+                                  <div>{t("orders.product.rackHeaderLine1")}</div>
+                                  <div className="text-[10px] font-normal opacity-95">{t("orders.product.rackHeaderLine2")}</div>
+                                </th>
+                                <th className="text-center text-[11px] font-semibold px-1 py-2 align-middle">
+                                  {t("orders.product.productStatus")}
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
-                              {order.products.map((p) => {
+                              {order.products.map((p, pIdx) => {
                                 const lineProductMemo = p.productMemo ?? order.productMemo ?? "";
                                 const lineCaution = p.caution ?? order.caution ?? "";
                                 const lineUserMemo = p.userMemo ?? order.userMemo ?? "";
+                                const rowNo = String(pIdx + 1).padStart(4, "0");
+                                const won = t("orders.common.won");
+                                const priceLine1 = `${won}${p.unitPrice.toLocaleString()} × ${p.quantity} = ${won}${p.totalPrice.toLocaleString()}`;
+                                const priceLine2 = `${won}${p.unitPrice.toLocaleString()} × ${p.quantity} = ${won}${p.totalPrice.toLocaleString()}`;
                                 return (
                                   <React.Fragment key={p.id}>
-                                    <tr className="">
-                                      <td className="text-center row-span-2">
-                                        <input type="checkbox" className="rounded border-gray-300" />
-                                      </td>
-                                      <td className="text-left font-medium text-blue-600">{p.productNo}</td>
-                                      <td className="text-left">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-200 text-[10px] font-semibold text-slate-500">
-                                          {p.image ? <img src={p.image} alt="" className="h-10 w-10 rounded-md object-cover" /> : "IMG"}
+                                    <tr className="bg-white align-middle">
+                                      {/* 1 상품번호 */}
+                                      <td className="text-center align-middle px-1 py-2 border border-gray-200">
+                                        <div className="flex flex-col items-center gap-1">
+                                          <label className="flex items-center justify-center gap-1.5 cursor-pointer">
+                                            <input type="checkbox" className="rounded border-gray-300" />
+                                            <span className="text-[12px] font-semibold text-gray-900">{rowNo}</span>
+                                          </label>
+                                          <button
+                                            type="button"
+                                            className="text-[11px] font-medium text-red-600 hover:underline"
+                                          >
+                                            {t("orders.product.productLog")}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] text-gray-800 hover:bg-gray-50"
+                                          >
+                                            {t("orders.action.packingSplit")}
+                                          </button>
                                         </div>
                                       </td>
-                                      <td className="text-left">
-                                        <div className="font-medium text-slate-800">{p.name}</div>
-                                        <div className="text-slate-500">{p.option}</div>
+                                      {/* 2 이미지 */}
+                                      <td className="text-center align-middle px-1 py-2 border border-gray-200">
+                                        <div className="flex flex-col items-center gap-1">
+                                          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded border border-gray-200 bg-slate-100 text-[9px] font-medium text-slate-500">
+                                            {p.image ? (
+                                              <img src={p.image} alt="" className="h-full w-full object-cover" />
+                                            ) : (
+                                              "IMG"
+                                            )}
+                                          </div>
+                                          <button
+                                            type="button"
+                                            className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[10px] text-gray-800 hover:bg-gray-50"
+                                          >
+                                            {t("orders.product.labelPrint")}
+                                          </button>
+                                        </div>
                                       </td>
-                                      <td className="text-left">
-                                        <div className="text-slate-700">{p.trackingNo || "-"}</div>
-                                        <div className="text-slate-400">{p.orderNo}</div>
+                                      {/* 3 상품명 / 옵션 */}
+                                      <td className="text-left align-middle px-2 py-2 border border-gray-200">
+                                        <div className="text-[12px] font-bold text-gray-900 leading-snug">{p.name}</div>
+                                        <div className="mt-0.5 text-[11px] text-gray-700 whitespace-pre-wrap leading-snug">
+                                          {p.option}
+                                        </div>
                                       </td>
-                                      <td className="text-right">
-                                        <span className="text-slate-500">{p.unitPrice.toLocaleString()}</span>
-                                        <span className="text-slate-400"> × {p.quantity} = </span>
-                                        <span className="font-semibold text-slate-800">{p.totalPrice.toLocaleString()}{t("orders.common.won")}</span>
+                                      {/* 4 트래킹 / 주문번호 */}
+                                      <td className="text-center align-middle px-1 py-2 border border-gray-200">
+                                        <div className="text-[11px] text-gray-800">
+                                          {t("orders.product.trackingNoColon")}:{p.trackingNo || "-"}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          className="mt-1 inline-flex rounded border border-gray-300 bg-white px-2 py-0.5 text-[10px] text-gray-800 hover:bg-gray-50"
+                                        >
+                                          {t("orders.product.actualPhoto")}
+                                        </button>
+                                        <div className="mt-1">
+                                          <button
+                                            type="button"
+                                            className="break-all text-[11px] font-medium text-blue-600 underline decoration-blue-400 hover:text-blue-800"
+                                          >
+                                            {p.orderNo}
+                                          </button>
+                                        </div>
                                       </td>
-                                      <td className="text-right">{p.shippingCost.toLocaleString()}{t("orders.common.won")}</td>
-                                      <td className="text-left">
-                                        <div>{p.rackNo}</div>
-                                        {p.prevRackNo && <div className="text-slate-400">{p.prevRackNo}</div>}
+                                      {/* 5 단가×수량 */}
+                                      <td className="text-right align-middle px-1 py-2 border border-gray-200">
+                                        <div className="text-[11px] font-semibold leading-snug text-red-600">{priceLine1}</div>
+                                        <div className="mt-1 text-[10px] leading-snug text-gray-600">{priceLine2}</div>
                                       </td>
-                                      <td className="text-left">
-                                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] text-blue-700">{p.statusLabel}</span>
+                                      {/* 6 운비 */}
+                                      <td className="text-center align-middle px-1 py-2 border border-gray-200">
+                                        <input
+                                          type="text"
+                                          defaultValue={`${won} ${p.shippingCost.toLocaleString()}`}
+                                          className="w-full max-w-[7rem] rounded border border-gray-300 bg-gray-100 py-1 text-center text-[11px] text-gray-800 mx-auto block"
+                                        />
+                                      </td>
+                                      {/* 7 랙번호 */}
+                                      <td className="text-left align-middle px-1 py-2 border border-gray-200">
+                                        <div className="text-[11px] text-gray-800">
+                                          {t("orders.product.rackNoColon")}: {p.rackNo || "-"}
+                                        </div>
+                                        <div className="mt-1 flex items-center gap-1">
+                                          <input
+                                            type="text"
+                                            placeholder={t("orders.product.rackNoPlaceholder")}
+                                            className="min-w-0 flex-1 rounded border border-gray-300 px-1 py-0.5 text-[11px]"
+                                          />
+                                          <button
+                                            type="button"
+                                            className="shrink-0 rounded bg-teal-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-teal-700"
+                                          >
+                                            {t("orders.product.rackSave")}
+                                          </button>
+                                        </div>
+                                        <div className="mt-1 text-[10px] text-gray-500">
+                                          {t("orders.product.prevRackColon")} {p.prevRackNo?.trim() ? p.prevRackNo : "—"}
+                                        </div>
+                                      </td>
+                                      {/* 8 상품상태 */}
+                                      <td className="text-center align-middle px-1 py-2 border border-gray-200">
+                                       <select
+                                          className="mx-auto mb-1 block w-full max-w-[10rem] text-[10px] leading-snug border border-gray-300 rounded-md py-1 px-1 bg-green-50 text-green-800"
+                                          aria-label={t("orders.common.warehouseStatus")}
+                                          value={
+                                            warehouseSelectByOrder[order.orderNo] ??
+                                            (warehouseSelectChoices.includes(order.warehouseStatus)
+                                              ? order.warehouseStatus
+                                              : (warehouseSelectChoices[0] ?? ""))
+                                          }
+                                          onChange={(e) =>
+                                            setWarehouseSelectByOrder((prev) => ({
+                                              ...prev,
+                                              [order.orderNo]: e.target.value,
+                                            }))
+                                          }
+                                        >
+                                          {warehouseSelectChoices.map((label) => (
+                                            <option key={label} value={label}>
+                                              {label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <div className="mt-1.5 flex flex-col items-center gap-0.5">
+                                          <span className="inline-block min-w-[4.5rem] rounded-sm border border-green-200 bg-green-100 px-1.5 py-0.5 text-center text-[10px] font-medium text-green-900">
+                                            {t("orders.inboundScan.workPending")}
+                                          </span>
+                                          <span className="inline-block min-w-[4.5rem] rounded-sm border border-green-200 bg-green-100 px-1.5 py-0.5 text-center text-[10px] font-medium text-green-900">
+                                            {t("orders.product.labelUnconfirmed")}
+                                          </span>
+                                          <span className="inline-block min-w-[4.5rem] rounded-sm border border-green-200 bg-green-100 px-1.5 py-0.5 text-center text-[10px] font-medium text-green-900">
+                                            {t("orders.action.issueProduct")}
+                                          </span>
+                                        </div>
                                       </td>
                                     </tr>
-                                    <tr className="bg-slate-50/90 ">
-                                      <td className="p-0" />
-                                    
-                                      <td colSpan={8} className="align-top ">
-                                        <div className="flex flex-col gap-1">
-                                          <div className="flex flex-row gap-2 justify-around">
-                                            <div className="flex items-center gap-2 w-1/2 ">
-                                              <label className="text-[11px] w-1/6 text-center font-semibold text-gray-700 block mb-0.5">{t("orders.product.productMemo")}</label>
-                                              <input
-                                                type="text"
-                                                defaultValue={lineProductMemo}
-                                                placeholder={t("orders.product.productMemo")}
-                                                className=" h-7 w-4/6 px-2 text-[11px] border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                              />                                            
-                                              <button className="h-7 w-1/6 px-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"> {t("orders.action.register")}</button>
-                                            </div>
-                                            <div className=" flex items-center gap-2 w-1/2 ">
-                                              <label className="text-[11px] w-1/6  text-center font-semibold text-orange-700 block mb-0.5">{t("orders.product.caution")}</label>
-                                              <input
-                                                type="text"
-                                                defaultValue={lineCaution}
-                                                placeholder={t("orders.product.caution")}
-                                                className=" h-7 w-4/6 px-2 text-[11px] border border-orange-300 rounded-md bg-white focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
-                                              />
-                                                <button className="h-7 w-1/6 px-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"> {t("orders.action.register")}</button>
-                                             </div>
-                                            
+                                    <tr className="bg-slate-50/90">
+                                      <td colSpan={8} className="border border-gray-200 px-3 py-2 align-top">
+                                        <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+                                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                                            <span className="shrink-0 text-[11px] font-semibold text-gray-700">
+                                              {t("orders.product.productMemo")}
+                                            </span>
+                                            <input
+                                              type="text"
+                                              defaultValue={lineProductMemo}
+                                              placeholder={t("orders.product.productMemo")}
+                                              className="h-7 min-w-0 flex-1 rounded border border-gray-300 px-2 text-[11px]"
+                                            />
+                                            <button
+                                              type="button"
+                                              className="shrink-0 rounded bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+                                            >
+                                              {t("orders.action.register")}
+                                            </button>
                                           </div>
-                                          <div className="flex items-center gap-2 w-1/2 justify-around">
-                                              <label className="text-[11px] w-1/6 text-center font-semibold text-gray-700 block mb-0.5">{t("orders.product.userMemo")}</label>
-                                              <input
-                                                type="text"
-                                                defaultValue={lineUserMemo}
-                                                placeholder={t("orders.product.userMemo")}
-                                                className="h-7 w-4/6 px-2 text-[11px] border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                              />
-                                              <button className="h-7 w-1/6 px-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"> {t("orders.action.register")}</button>
-                                            </div>
+                                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                                            <span className="shrink-0 text-[11px] font-semibold text-orange-700">
+                                              {t("orders.product.caution")}
+                                            </span>
+                                            <input
+                                              type="text"
+                                              defaultValue={lineCaution}
+                                              placeholder={t("orders.product.caution")}
+                                              className="h-7 min-w-0 flex-1 rounded border border-orange-300 bg-white px-2 text-[11px]"
+                                            />
+                                            <button
+                                              type="button"
+                                              className="shrink-0 rounded bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+                                            >
+                                              {t("orders.action.register")}
+                                            </button>
+                                          </div>
+                                          <div className="flex min-w-0 flex-[1_1_100%] items-center gap-2 lg:flex-[1_1_40%]">
+                                            <span className="shrink-0 text-[11px] font-semibold text-gray-700">
+                                              {t("orders.product.userMemo")}
+                                            </span>
+                                            <input
+                                              type="text"
+                                              defaultValue={lineUserMemo}
+                                              placeholder={t("orders.product.userMemo")}
+                                              className="h-7 min-w-0 flex-1 rounded border border-gray-300 px-2 text-[11px]"
+                                            />
+                                            <button
+                                              type="button"
+                                              className="shrink-0 rounded bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+                                            >
+                                              {t("orders.action.register")}
+                                            </button>
+                                          </div>
                                         </div>
                                       </td>
                                     </tr>
@@ -884,7 +1343,7 @@ export default function OrderBoard({
 
         {/* ── Pagination ────────────────────────────────────────────── */}
         <div className="flex items-center justify-between text-sm text-gray-500">
-          <span>{t("orders.common.count")}: {filteredOrders.length.toLocaleString()}</span>
+          <span>{t("orders.common.count")}: {displayOrderCount.toLocaleString()}</span>
           <div className="flex items-center gap-2">
             <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} className="h-8 px-2 text-sm border border-gray-300 rounded-md">
               <option value={10}>10</option>
@@ -1098,116 +1557,6 @@ export default function OrderBoard({
         </div>
       )}
 
-      {orderColumnModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="order-column-modal-title"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setOrderColumnModal(null)}
-        >
-          <div
-            className="w-full max-w-lg max-h-[85vh] overflow-hidden rounded-xl bg-white shadow-xl flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 shrink-0">
-              <h2 id="order-column-modal-title" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                {orderColumnModal.mode === "view" ? (
-                  <>
-                    <Eye className="w-5 h-5 text-blue-600" />
-                    {t("orders.action.viewOrder")}
-                  </>
-                ) : (
-                  <>
-                    <History className="w-5 h-5 text-blue-600" />
-                    {t("orders.action.log")}
-                  </>
-                )}
-                <span className="text-sm font-normal text-gray-500">({orderColumnModal.order.orderNo})</span>
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOrderColumnModal(null)}
-                className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                aria-label={t("orders.common.close")}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="overflow-y-auto px-5 py-4 text-sm text-gray-800">
-              {orderColumnModal.mode === "view" ? (
-                <dl className="grid grid-cols-[minmax(0,7.5rem)_1fr] gap-x-3 gap-y-2 text-xs">
-                  <dt className="text-gray-500">{t("orders.common.orderNumber")}</dt>
-                  <dd className="font-medium text-blue-600">{orderColumnModal.order.orderNo}</dd>
-                  <dt className="text-gray-500">{t("orders.common.center")}</dt>
-                  <dd>{orderColumnModal.order.center}</dd>
-                  <dt className="text-gray-500">{t("orders.common.applicationType")}</dt>
-                  <dd>{orderColumnModal.order.applicationType}</dd>
-                  <dt className="text-gray-500">{t("orders.common.customsClearance")}</dt>
-                  <dd>{orderColumnModal.order.customsClearance}</dd>
-                  <dt className="text-gray-500">{t("orders.common.productType")}</dt>
-                  <dd>{orderColumnModal.order.typeLabel}</dd>
-                  <dt className="text-gray-500">{t("orders.common.shippingMethod")}</dt>
-                  <dd>{orderColumnModal.order.shippingMethod}</dd>
-                  <dt className="text-gray-500">{t("orders.common.membershipCode")}</dt>
-                  <dd>{orderColumnModal.order.memberBadge}</dd>
-                  <dt className="text-gray-500">{t("orders.common.receiver")}</dt>
-                  <dd>{orderColumnModal.order.receiver}</dd>
-                  <dt className="text-gray-500">{t("orders.common.quantity")}</dt>
-                  <dd>{orderColumnModal.order.qty}{t("orders.common.items")}</dd>
-                  <dt className="text-gray-500">{t("orders.common.totalAmount")}</dt>
-                  <dd>{orderColumnModal.order.totalAmount.toLocaleString()}{t("orders.common.won")}</dd>
-                  <dt className="text-gray-500">{t("orders.common.paidAmount")}</dt>
-                  <dd>{orderColumnModal.order.paidAmount.toLocaleString()}{t("orders.common.won")}</dd>
-                  <dt className="text-gray-500">{t("orders.common.weight")}</dt>
-                  <dd>{orderColumnModal.order.weight}kg</dd>
-                  <dt className="text-gray-500">{t("orders.common.warehouseStatus")}</dt>
-                  <dd>{orderColumnModal.order.warehouseStatus}</dd>
-                  <dt className="text-gray-500">{t("orders.common.progressStatus")}</dt>
-                  <dd>{orderColumnModal.order.progressStatus}</dd>
-                  <dt className="text-gray-500">{t("orders.common.createdAt")}</dt>
-                  <dd>{orderColumnModal.order.createdAt}</dd>
-                  <dt className="text-gray-500">{t("orders.common.updatedAt")}</dt>
-                  <dd>{orderColumnModal.order.updatedAt}</dd>
-                  <dt className="text-gray-500">{t("orders.common.inquiryResponder")}</dt>
-                  <dd>{orderColumnModal.order.inquiryResponder ?? t("orders.common.none")}</dd>
-                  <dt className="text-gray-500">{t("orders.common.buyer")}</dt>
-                  <dd>{orderColumnModal.order.buyer ?? "-"}</dd>
-                </dl>
-              ) : (
-                <ul className="space-y-3 border-l-2 border-gray-200 pl-4 ml-1">
-                  <li className="relative">
-                    <span className="absolute -left-[calc(0.5rem+5px)] top-1.5 h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white" />
-                    <p className="text-xs text-gray-500">{orderColumnModal.order.createdAt}</p>
-                    <p className="font-medium text-gray-900">{t("orders.board.logLineCreated")}</p>
-                  </li>
-                  <li className="relative">
-                    <span className="absolute -left-[calc(0.5rem+5px)] top-1.5 h-2 w-2 rounded-full bg-slate-400 ring-2 ring-white" />
-                    <p className="text-xs text-gray-500">{orderColumnModal.order.updatedAt}</p>
-                    <p className="font-medium text-gray-900">{t("orders.board.logLineUpdated")}</p>
-                  </li>
-                  <li className="relative">
-                    <span className="absolute -left-[calc(0.5rem+5px)] top-1.5 h-2 w-2 rounded-full bg-slate-400 ring-2 ring-white" />
-                    <p className="text-xs text-gray-500">{orderColumnModal.order.updatedAt}</p>
-                    <p className="font-medium text-gray-900">
-                      {t("orders.board.logLineStatus")}: {orderColumnModal.order.progressStatus}
-                    </p>
-                  </li>
-                </ul>
-              )}
-            </div>
-            <div className="border-t border-gray-200 px-5 py-3 flex justify-end shrink-0">
-              <button
-                type="button"
-                onClick={() => setOrderColumnModal(null)}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                {t("orders.common.close")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

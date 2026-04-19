@@ -9,13 +9,18 @@ export default function RocketOrders() {
 
   const statusGroups: OrderBoardStatusGroup[] = [
     { title: t("orders.status.purchase"), icon: <ShoppingCart className="w-4 h-4" />, color: "text-purple-600", items: [
-      { label: t("orders.status.tempSave"), code: "BUY_TEMP" }, { label: t("orders.status.purchaseQuote"), code: "BUY_EST" }, { label: t("orders.status.purchasePaymentPending"), code: "BUY_PAY_WAIT" },
-      { label: t("orders.status.purchasePaymentComplete"), code: "BUY_PAY_DONE" }, { label: t("orders.status.purchasing"), code: "BUYING" }, { label: t("orders.status.problemProduct"), code: "PROBLEM_PRODUCT" }, { label: t("orders.status.purchaseComplete"), code: "BUY_COMPLETE" },
+      { label: t("orders.status.tempSave"), code: "P_TEMPSAVE" }, 
+      { label: t("orders.status.purchaseQuote"), code: "P_QUOTE" }, 
+      { label: t("orders.status.purchasePaymentPending"), code: "P_PENDING" },
+      { label: t("orders.status.purchasePaymentComplete"), code: "P_PAY_COMPLETE" }, 
+      { label: t("orders.status.purchasing"), code: "P_AU_PURCHASING" }, 
+      { label: t("orders.status.problemProduct"), code: "P_MA_PROBLEM" }, 
+      { label: t("orders.status.purchaseComplete"), code: "P_PUR_COMPLETE" },
     ]},
     { title: t("orders.status.inOut"), icon: <Warehouse className="w-4 h-4" />, color: "text-blue-500", items: [
-      { label: t("orders.status.centerArrivalExpected"), code: "WH_ARRIVE_EXPECTED" }, { label: t("orders.status.localDeliveryDelay"), code: "LOCAL_DELAY" }, { label: t("orders.status.warehouseInProgress"), code: "WH_IN_PROGRESS" },
-      { label: t("orders.status.warehouseInComplete"), code: "WH_IN_DONE" }, { label: t("orders.status.shipmentPaymentPending"), code: "SHIP_PAY_WAIT" }, { label: t("orders.status.shipmentPending"), code: "WH_SHIP_WAIT" },
-      { label: t("orders.status.shipmentComplete"), code: "WH_SHIPPED" }, { label: t("orders.status.additionalCostPaymentPending"), code: "ADD_COST_PAY_WAIT" }, { label: t("orders.status.additionalCostPaymentComplete"), code: "ADD_COST_PAY_DONE" },
+      { label: t("orders.status.centerArrivalExpected"), code: "IO_ARRIVE_EXPECTED" }, { label: t("orders.status.localDeliveryDelay"), code: "IO_DELAY" }, { label: t("orders.status.warehouseInProgress"), code: "IO_PROGRESS" },
+      { label: t("orders.status.warehouseInComplete"), code: "IO_WARE_COMPLETE" }, { label: t("orders.status.shipmentPaymentPending"), code: "IO_SHIP_PAY_PENDING" }, { label: t("orders.status.shipmentPending"), code: "IO_SHIP_PENDING" },
+      { label: t("orders.status.shipmentComplete"), code: "IO_SHIP_COMPLETE" }, { label: t("orders.status.additionalCostPaymentPending"), code: "IO_COST_PENDING" }, { label: t("orders.status.additionalCostPaymentComplete"), code: "IO_COST_COMPLETE" },
       { label: t("orders.status.shippingProcessing"), code: "DELIVERY_IN_PROGRESS" }, { label: t("orders.status.deliveryComplete"), code: "DELIVERY_DONE" },
     ]},
     { title: t("orders.status.error"), icon: <AlertTriangle className="w-4 h-4" />, color: "text-red-500", items: [

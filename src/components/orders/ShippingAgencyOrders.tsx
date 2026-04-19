@@ -13,8 +13,13 @@ export default function ShippingAgencyOrders() {
       icon: <Truck className="w-4 h-4" />,
       color: "text-teal-600",
       items: [
-        { label: t("orders.status.tempSave"), code: "DEL_TEMP" },
-        { label: t("orders.status.receiptApplication"), code: "DEL_RECEIPT_APP" },
+        { label: t("orders.status.tempSave"), code: "P_TEMPSAVE" },
+        { label: t("orders.status.purchaseQuote"), code: "P_QUOTE" },
+        { label: t("orders.status.purchasePaymentPending"), code: "P_PENDING" },
+        { label: t("orders.status.purchasePaymentComplete"), code: "P_PAY_COMPLETE" },
+        { label: t("orders.status.purchasing"), code: "P_AU_PURCHASING" },
+        { label: t("orders.status.problemProduct"), code: "P_MA_PROBLEM" },
+        { label: t("orders.status.purchaseComplete"), code: "P_PUR_COMPLETE" },
       ],
     },
     {

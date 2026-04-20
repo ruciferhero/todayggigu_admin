@@ -1,35 +1,57 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import HorizontalMenu from "@/components/HorizontalMenu";
 
+/** 주문문의·구매비용 견적 팝업 — 상단 관리 헤더·가로 메뉴 없이 본문만 */
+function isToolWindowPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname.startsWith("/admin/orders/business/purchase-cost") ||
+    pathname.startsWith("/admin/orders/business/order-inquiry")
+  );
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [isNavigationVisible, setIsNavigationVisible] = useState(true);
+  const hideChrome = isToolWindowPath(pathname);
 
   useEffect(() => {
+    if (isLoading) return;
     if (!isAuthenticated) {
-      router.push("/login");
+      router.replace("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
-  if (!isAuthenticated) {
+  if (isLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
-      <Header onMenuToggle={() => setIsNavigationVisible((prev) => !prev)} />
-      {isNavigationVisible && <HorizontalMenu />}
-      <main className="flex-1 p-5 bg-gray-100">{children}</main>
+    <div className="flex min-h-screen flex-col bg-slate-50">
+      {!hideChrome && (
+        <>
+          <Header onMenuToggle={() => setIsNavigationVisible((prev) => !prev)} />
+          {isNavigationVisible && <HorizontalMenu />}
+        </>
+      )}
+      <main
+        className={
+          hideChrome ? "min-h-screen flex-1 bg-gray-100 p-0" : "flex-1 bg-gray-100 p-5"
+        }
+      >
+        {children}
+      </main>
     </div>
   );
 }

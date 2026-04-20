@@ -40,3 +40,12 @@ export function resolveProgressSelectValue(
   }
   return progressOptions[0]?.code ?? orderStatusCode;
 }
+
+/** API 진행 코드: 검색·PATCH 모두 `progressStatus`; `progressStatusParam` 또는 board `code`. */
+export function resolveProgressStatusApiParam(
+  boardCode: string,
+  flatItems: readonly OrderBoardStatusItem[],
+): string {
+  const hit = flatItems.find((x) => x.code === boardCode);                                                          
+  return (hit?.progressStatusParam ?? boardCode).trim();
+}

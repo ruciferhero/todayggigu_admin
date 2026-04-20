@@ -3,6 +3,7 @@ import { Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LocaleProvider } from "@/contexts/LocaleContext";
+import ToastViewport from "@/components/common/ToastViewport";
 
 const notoSans = Noto_Sans_KR({
   subsets: ["latin"],
@@ -23,7 +24,10 @@ export default function RootLayout({
     <html lang="en" className={`h-full ${notoSans.className}`}>
       <body className="min-h-full">
         <LocaleProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            {children}
+            <ToastViewport />
+          </AuthProvider>
         </LocaleProvider>
       </body>
     </html>

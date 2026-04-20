@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, getRefreshToken } from "./client";
 
 export interface AuthUser {
   id: string;
@@ -39,9 +39,77 @@ export async function logout(): Promise<void> {
   }
 }
 
-export async function fetchMe(): Promise<AuthUser> {
-  const raw = await apiFetch<unknown>("/admin/auth/me");
-  return extractAdmin(raw, "me");
+/**
+ * Build `AuthUser` from the stored access token (JWT payload) — no `/admin/auth/me` call.
+ * If the token is not a JWT, returns a minimal placeholder so the session is still treated as logged in.
+ */
+export function sessionUserFromAccessToken(accessToken: string): AuthUser {
+  const payload = tryParseJwtPayload(accessToken);
+  if (!payload || typeof payload !== "object") {
+    return {
+      id: "",
+      email: "session",
+      name: "Admin",
+      role: "",
+      permissions: [],
+    };
+  }
+  const rec = payload as Record<string, unknown>;
+  const email =
+    pickString(rec, ["email"]) ??
+    (typeof rec.sub === "string" ? rec.sub : null) ??
+    "session";
+  const name =
+    pickString(rec, ["name", "userName", "nickname"]) ?? email.split("@")[0] ?? "Admin";
+  return {
+    id: pickString(rec, ["_id", "id", "sub"]) ?? "",
+    email,
+    name,
+    role: pickString(rec, ["role"]) ?? "",
+    permissions: Array.isArray(rec.permissions) ? (rec.permissions as string[]) : [],
+  };
+}
+
+/** True if JWT `exp` is in the past (or within `skewSec`). Non-JWT tokens return false. */
+export function accessTokenLooksExpired(accessToken: string, skewSec = 60): boolean {
+  const payload = tryParseJwtPayload(accessToken);
+  if (!payload || typeof payload !== "object") return false;
+  const exp = (payload as Record<string, unknown>).exp;
+  if (typeof exp !== "number") return false;
+  return Date.now() / 1000 >= exp - skewSec;
+}
+
+function tryParseJwtPayload(token: string): unknown | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  try {
+    if (typeof atob === "undefined") return null;
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+/** POST `/admin/auth/refresh` — returns new access token when refresh token is valid. */
+export async function refreshAccessToken(): Promise<{
+  token: string;
+  refreshToken: string;
+} | null> {
+  const rt = getRefreshToken();
+  if (!rt) return null;
+  try {
+    const raw = await apiFetch<unknown>("/admin/auth/refresh", {
+      method: "POST",
+      body: { refreshToken: rt },
+      auth: false,
+    });
+    const tokens = extractTokens(raw);
+    return { token: tokens.token, refreshToken: tokens.refreshToken };
+  } catch {
+    return null;
+  }
 }
 
 function extractAdmin(raw: unknown, context: string): AuthUser {

@@ -1,12 +1,13 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import * as authApi from "@/api/auth";
 import type { AuthUser } from "@/api/auth";
 import {
   ApiError,
   getToken,
+  getRefreshToken,
   setToken,
   setRefreshToken,
 } from "@/api/client";
@@ -27,36 +28,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
-    if (pathname === "/login") {
-      setIsLoading(false);
-      return;
-    }
-    if (!getToken()) {
-      setIsLoading(false);
-      return;
-    }
     let cancelled = false;
-    (async () => {
-      try {
-        const me = await authApi.fetchMe();
-        if (!cancelled) setUser(me);
-      } catch {
+
+    async function bootstrap() {
+      let token = getToken();
+      if (!token) {
         if (!cancelled) {
-          setToken(null);
-          setRefreshToken(null);
           setUser(null);
+          setIsLoading(false);
         }
-      } finally {
-        if (!cancelled) setIsLoading(false);
+        return;
       }
-    })();
+
+      if (authApi.accessTokenLooksExpired(token)) {
+        if (getRefreshToken()) {
+          const refreshed = await authApi.refreshAccessToken();
+          if (refreshed?.token) {
+            setToken(refreshed.token);
+            if (refreshed.refreshToken) setRefreshToken(refreshed.refreshToken);
+            token = refreshed.token;
+          } else {
+            if (!cancelled) {
+              setToken(null);
+              setRefreshToken(null);
+              setUser(null);
+              setIsLoading(false);
+            }
+            return;
+          }
+        } else {
+          if (!cancelled) {
+            setToken(null);
+            setUser(null);
+            setIsLoading(false);
+          }
+          return;
+        }
+      }
+
+      if (!cancelled) {
+        setUser(authApi.sessionUserFromAccessToken(token));
+        setIsLoading(false);
+      }
+    }
+
+    void bootstrap();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login: AuthContextType["login"] = async (email, password) => {
@@ -84,10 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     router.push("/login");
   };
-
-  if (isLoading) {
-    return null;
-  }
 
   return (
     <AuthContext.Provider

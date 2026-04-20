@@ -1,19 +1,35 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   ChevronDown, ChevronUp, Download, Eye, History, Minus, Plus,
   RotateCcw, Save, Search, Upload, X,
 } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
-import { fetchManualOrderProgressCountsOnly, fetchManualOrdersSearch } from "@/api/orders/manualSearch";
+import {
+  fetchManualOrderProgressCountsOnly,
+  fetchManualOrdersSearch,
+  patchManualOrderAdminMemo,
+  patchManualOrderLineCaution,
+  patchManualOrderLineProductMemo,
+  patchManualOrderLineRack,
+  patchManualOrderLineTracking,
+  patchManualOrderLineUserMemo,
+  patchManualOrderProgress,
+  resolveManualOrderPatchIdentifier,
+} from "@/api/orders/manualSearch";
+import { ApiError } from "@/api/client";
 import {
   getProgressSelectOptionsForOrder,
   resolveProgressSelectValue,
+  resolveProgressStatusApiParam,
 } from "./orderBoardProgressColumnOptions";
 import { buildOrderViewWindowHtml, type OrderViewWindowLabels } from "./orderViewWindowDocument";
 import { buildOrderLogWindowHtml, type OrderLogWindowLabels } from "./orderLogWindowDocument";
+import { putOrderBoardWindowPayload } from "@/lib/orderBoardWindowPayload";
+import { downloadXlsxFromAoA } from "@/lib/excelDownload";
+import { showToast } from "@/lib/toast";
 
 /* ─── Public types ──────────────────────────────────────────────────────── */
 
@@ -44,6 +60,15 @@ export interface OrderBoardProduct {
   productMemo?: string;
   caution?: string;
   userMemo?: string;
+  /**
+   * `GET …/orders/manual/search` 주문·라인 필드 `workPending` / `labelstate` / `issueproduct`.
+   * 값이 `yes`인 항목만 상품 행 태그 `<ul>`에 표시.
+   */
+  manualStatusTags?: {
+    workPending: boolean;
+    labelState: boolean;
+    issueProduct: boolean;
+  };
 }
 
 export interface OrderBoardOrder {
@@ -52,6 +77,8 @@ export interface OrderBoardOrder {
   center: string;
   applicationType: string;
   customsClearance: string;
+  /** API `custommethod` — 통관방식. 없으면 테이블 통관란에 `customsClearance` 폴백 */
+  customsMethod?: string;
   typeLabel: string;
   shippingMethod: string;
   isShipped: boolean;
@@ -78,6 +105,8 @@ export interface OrderBoardOrder {
   caution?: string;
   userMemo?: string;
   products: OrderBoardProduct[];
+  /** `PATCH …/orders/manual/:id` — 있으면 Mongo `_id`(Postman), 없으면 `orderNo`로 PATCH */
+  manualOrderPatchId?: string;
 }
 
 interface Props {
@@ -109,7 +138,7 @@ const PURCHASE_AGENCY_ROW_BASE: readonly string[] = [
 const PURCHASE_AGENCY_ROW_EXTRA_BY_STATUS: Record<string, readonly string[]> = {
   BUY_TEMP: ["orders.rowAction.delete"],
   /* 접수신청 단계: 현재 보드의 구매견적(BUY_EST)에 매핑 */
-  BUY_EST: ["orders.rowAction.split", "orders.rowAction.delete"],
+  BUY_EST: [ "orders.rowAction.purchaseCost", "orders.rowAction.delete"],
   WH_ARRIVE_EXPECTED: ["orders.rowAction.agencyExtraCost"],
   LOCAL_DELAY: ["orders.rowAction.agencyExtraCost"],
   WH_IN_PROGRESS: ["orders.rowAction.agencyExtraCost", "orders.rowAction.split"],
@@ -160,6 +189,25 @@ function rowActionButtonClass(labelKey: string): string {
 const ORDER_BOARD_COL_SUM_UNITS = 11.5;
 const ORDER_BOARD_DATA_COL_W = `calc(100% / ${ORDER_BOARD_COL_SUM_UNITS})`;
 const ORDER_BOARD_ACTION_COL_W = `calc(100% * 1.5 / ${ORDER_BOARD_COL_SUM_UNITS})`;
+
+function clampPopupSize(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+/**
+ * 주문문의: 내용(`max-w-6xl`, 상품표 `min-w-[900px]`) 비율은 유지하고 화면에 맞게 가변.
+ * 구매비용: 기존 고정 크기.
+ */
+function agencyToolPopupDimensions(segment: "order-inquiry" | "purchase-cost"): { w: number; h: number } {
+  const aw = window.screen.availWidth;
+  const ah = window.screen.availHeight;
+  if (segment === "purchase-cost") {
+    return { w: 920, h: 720 };
+  }
+  const w = clampPopupSize(Math.round(aw * 0.88), 960, 1180);
+  const h = clampPopupSize(Math.round(ah * 0.86), 640, 920);
+  return { w, h };
+}
 
 /** Panel filter values applied on "Search" (draft mirrors inputs until then). */
 interface OrderBoardSearchFilters {
@@ -249,12 +297,14 @@ function OrderBoardProgressSelectCell({
   t,
   progressSelectByOrder,
   setProgressSelectByOrder,
+  onProgressChange,
 }: {
   order: OrderBoardOrder;
   flatStatusItems: OrderBoardStatusItem[];
   t: (key: string) => string;
   progressSelectByOrder: Record<string, string>;
   setProgressSelectByOrder: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  onProgressChange?: (order: OrderBoardOrder, boardCode: string) => void;
 }) {
   const progressOptions = getProgressSelectOptionsForOrder(order.statusCode, flatStatusItems);
   const progressValue = resolveProgressSelectValue(
@@ -268,12 +318,14 @@ function OrderBoardProgressSelectCell({
       className="mx-auto block w-full max-w-[10rem] text-[10px] leading-snug border border-gray-300 rounded-md py-1 px-1 bg-white text-gray-800"
       aria-label={t("orders.common.progressStatus")}
       value={progressValue}
-      onChange={(e) =>
+      onChange={(e) => {
+        const boardCode = e.target.value;
         setProgressSelectByOrder((prev) => ({
           ...prev,
-          [order.orderNo]: e.target.value,
-        }))
-      }
+          [order.orderNo]: boardCode,
+        }));
+        onProgressChange?.(order, boardCode);
+      }}
     >
       {!progressOptions.some((s) => s.code === order.statusCode) &&
         order.statusCode &&
@@ -298,6 +350,49 @@ export default function OrderBoard({
   ordersDataSource = "props",
 }: Props) {
   const { t } = useLocale();
+
+  /**
+   * 주문문의 / 구매비용: `localStorage` + `?k=` 로 표 데이터 넘긴 뒤 **팝업 창**.
+   * 주문문의는 화면에 맞게 가변 크기, 구매비용은 고정(920×720).
+   */
+  const openPurchaseAgencyToolTab = useCallback(
+    (order: OrderBoardOrder, segment: "order-inquiry" | "purchase-cost") => {
+      const token = putOrderBoardWindowPayload(order);
+      if (!token) return;
+      const path = `/admin/orders/business/${segment}?k=${encodeURIComponent(token)}`;
+      const url = `${window.location.origin}${path}`;
+      const { w, h } = agencyToolPopupDimensions(segment);
+      const left = Math.max(0, Math.floor((window.screen.availWidth - w) / 2));
+      const top = Math.max(0, Math.floor((window.screen.availHeight - h) / 2));
+      const features = [
+        `width=${w}`,
+        `height=${h}`,
+        `left=${left}`,
+        `top=${top}`,
+        "scrollbars=yes",
+        "resizable=yes",
+        "menubar=no",
+        "toolbar=no",
+      ].join(",");
+      const popup = window.open(url, "_blank", features);
+      if (popup) popup.opener = null;
+    },
+    [],
+  );
+
+  const handlePurchaseAgencyRowAction = useCallback(
+    (order: OrderBoardOrder, labelKey: string) => {
+      if (labelKey === "orders.rowAction.orderInquiry") {
+        openPurchaseAgencyToolTab(order, "order-inquiry");
+        return;
+      }
+      if (labelKey === "orders.rowAction.purchaseCost") {
+        openPurchaseAgencyToolTab(order, "purchase-cost");
+        return;
+      }
+    },
+    [openPurchaseAgencyToolTab],
+  );
 
   const openOrderViewWindow = (order: OrderBoardOrder) => {
     const win = window.open("", "_blank");
@@ -426,6 +521,8 @@ export default function OrderBoard({
   /** Row-local 입고상태 / 진행상태 select 값 (서버 반영 전 UI만) */
   const [warehouseSelectByOrder, setWarehouseSelectByOrder] = useState<Record<string, string>>({});
   const [progressSelectByOrder, setProgressSelectByOrder] = useState<Record<string, string>>({});
+  /** 확장 행: `orderNo` → 선택된 상품 라인 `product.id` */
+  const [productLineSelection, setProductLineSelection] = useState<Record<string, Set<string>>>({});
   const [apiRows, setApiRows] = useState<OrderBoardOrder[]>([]);
   const [apiProgressCounts, setApiProgressCounts] = useState<Map<string, number>>(new Map());
   const [apiLoading, setApiLoading] = useState(false);
@@ -433,6 +530,12 @@ export default function OrderBoard({
   /** Total rows matching current server query (for header/footer when not using panel filters). */
   const [apiMatchTotal, setApiMatchTotal] = useState<number | null>(null);
   const apiExpandInit = useRef(false);
+  const memoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const batchTrackingInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const rackInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const productMemoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const cautionInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const userMemoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   /* derived */
   const flatStatusItems = useMemo(() => statusGroups.flatMap((g) => g.items), [statusGroups]);
@@ -445,6 +548,202 @@ export default function OrderBoard({
     }
     return selectedCode;
   }, [selectedCode, statusGroups]);
+
+  const reloadManualSearchAfterMutation = useCallback(async () => {
+    if (ordersDataSource !== "manualSearchApi") return;
+    void fetchManualOrderProgressCountsOnly(t)
+      .then((counts) => setApiProgressCounts(counts))
+      .catch(() => {});
+    setApiLoading(true);
+    try {
+      const res = await fetchManualOrdersSearch(
+        { progressStatus: progressQueryParam, page: currentPage, pageSize },
+        t,
+      );
+      setApiRows(res.orders);
+      setApiTotalPages(res.pagination.totalPages);
+      const matchTotal =
+        res.pagination.total > 0
+          ? res.pagination.total
+          : res.totalOrders > 0
+            ? res.totalOrders
+            : res.orders.length;
+      setApiMatchTotal(matchTotal);
+    } catch {
+      setApiRows([]);
+      setApiMatchTotal(null);
+      setApiTotalPages(1);
+    } finally {
+      setApiLoading(false);
+    }
+  }, [ordersDataSource, progressQueryParam, currentPage, pageSize, t]);
+
+  const handleManualProgressChange = useCallback(
+    (order: OrderBoardOrder, newBoardCode: string) => {
+      if (ordersDataSource !== "manualSearchApi") return;
+      const progressStatus = resolveProgressStatusApiParam(newBoardCode, flatStatusItems);
+      patchManualOrderProgress(resolveManualOrderPatchIdentifier(order), progressStatus)
+        .then(() => {
+          setProgressSelectByOrder((prev) => {
+            const next = { ...prev };
+            delete next[order.orderNo];
+            return next;
+          });
+          void reloadManualSearchAfterMutation();
+        })
+        .catch((e) => {
+          setProgressSelectByOrder((prev) => {
+            const next = { ...prev };
+            delete next[order.orderNo];
+            return next;
+          });
+          const msg =
+            e instanceof ApiError ? e.message : t("orders.board.progressUpdateFailed");
+          showToast({ message: msg, variant: "error" });
+        });
+    },
+    [ordersDataSource, flatStatusItems, t, reloadManualSearchAfterMutation],
+  );
+
+  const toggleProductLineSelected = useCallback((orderNo: string, productId: string) => {
+    setProductLineSelection((prev) => {
+      const next = { ...prev };
+      const cur = new Set(next[orderNo] ?? []);
+      if (cur.has(productId)) cur.delete(productId);
+      else cur.add(productId);
+      next[orderNo] = cur;
+      return next;
+    });
+  }, []);
+
+  const handleAdminMemoRegister = useCallback(
+    async (order: OrderBoardOrder) => {
+      if (ordersDataSource !== "manualSearchApi") return;
+      const el = memoInputRefs.current[order.orderNo];
+      const v = el?.value ?? "";
+      try {
+        await patchManualOrderAdminMemo(order, v);
+        await reloadManualSearchAfterMutation();
+        showToast({ message: t("orders.board.memoSaved"), variant: "success" });
+      } catch (e) {
+        showToast({
+          message: e instanceof ApiError ? e.message : t("orders.board.manualPatchFailed"),
+          variant: "error",
+        });
+      }
+    },
+    [ordersDataSource, reloadManualSearchAfterMutation, t],
+  );
+
+  const handleBatchTrackingSave = useCallback(
+    async (order: OrderBoardOrder) => {
+      if (ordersDataSource !== "manualSearchApi") return;
+      const sel = productLineSelection[order.orderNo];
+      if (!sel?.size) {
+        showToast({ message: t("orders.board.batchSaveNoSelection"), variant: "warning" });
+        return;
+      }
+      const tn = batchTrackingInputRefs.current[order.orderNo]?.value?.trim() ?? "";
+      if (!tn) {
+        showToast({ message: t("orders.board.batchSaveTrackingEmpty"), variant: "warning" });
+        return;
+      }
+      try {
+        for (const pid of sel) {
+          const p = order.products.find((x) => x.id === pid);
+          if (p) await patchManualOrderLineTracking(order, p, tn);
+        }
+        setProductLineSelection((prev) => ({ ...prev, [order.orderNo]: new Set() }));
+        const inp = batchTrackingInputRefs.current[order.orderNo];
+        if (inp) inp.value = "";
+        await reloadManualSearchAfterMutation();
+      } catch (e) {
+        showToast({
+          message: e instanceof ApiError ? e.message : t("orders.board.manualPatchFailed"),
+          variant: "error",
+        });
+      }
+    },
+    [ordersDataSource, productLineSelection, reloadManualSearchAfterMutation, t],
+  );
+
+  const handleRackLineSave = useCallback(
+    async (order: OrderBoardOrder, product: OrderBoardProduct) => {
+      if (ordersDataSource !== "manualSearchApi") return;
+      const k = `${order.orderNo}:::${product.id}`;
+      const v = rackInputRefs.current[k]?.value?.trim() ?? "";
+      if (!v) return;
+      try {
+        await patchManualOrderLineRack(order, product, v);
+        const inp = rackInputRefs.current[k];
+        if (inp) inp.value = "";
+        await reloadManualSearchAfterMutation();
+      } catch (e) {
+        showToast({
+          message: e instanceof ApiError ? e.message : t("orders.board.manualPatchFailed"),
+          variant: "error",
+        });
+      }
+    },
+    [ordersDataSource, reloadManualSearchAfterMutation, t],
+  );
+
+  const handleProductMemoLineSave = useCallback(
+    async (order: OrderBoardOrder, product: OrderBoardProduct) => {
+      if (ordersDataSource !== "manualSearchApi") return;
+      const k = `${order.orderNo}:::${product.id}`;
+      const v = productMemoInputRefs.current[k]?.value ?? "";
+      try {
+        await patchManualOrderLineProductMemo(order, product, v);
+        await reloadManualSearchAfterMutation();
+        showToast({ message: t("orders.board.lineMemoSaved"), variant: "success" });
+      } catch (e) {
+        showToast({
+          message: e instanceof ApiError ? e.message : t("orders.board.manualPatchFailed"),
+          variant: "error",
+        });
+      }
+    },
+    [ordersDataSource, reloadManualSearchAfterMutation, t],
+  );
+
+  const handleCautionLineSave = useCallback(
+    async (order: OrderBoardOrder, product: OrderBoardProduct) => {
+      if (ordersDataSource !== "manualSearchApi") return;
+      const k = `${order.orderNo}:::${product.id}`;
+      const v = cautionInputRefs.current[k]?.value ?? "";
+      try {
+        await patchManualOrderLineCaution(order, product, v);
+        await reloadManualSearchAfterMutation();
+        showToast({ message: t("orders.board.lineMemoSaved"), variant: "success" });
+      } catch (e) {
+        showToast({
+          message: e instanceof ApiError ? e.message : t("orders.board.manualPatchFailed"),
+          variant: "error",
+        });
+      }
+    },
+    [ordersDataSource, reloadManualSearchAfterMutation, t],
+  );
+
+  const handleUserMemoLineSave = useCallback(
+    async (order: OrderBoardOrder, product: OrderBoardProduct) => {
+      if (ordersDataSource !== "manualSearchApi") return;
+      const k = `${order.orderNo}:::${product.id}`;
+      const v = userMemoInputRefs.current[k]?.value ?? "";
+      try {
+        await patchManualOrderLineUserMemo(order, product, v);
+        await reloadManualSearchAfterMutation();
+        showToast({ message: t("orders.board.lineMemoSaved"), variant: "success" });
+      } catch (e) {
+        showToast({
+          message: e instanceof ApiError ? e.message : t("orders.board.manualPatchFailed"),
+          variant: "error",
+        });
+      }
+    },
+    [ordersDataSource, reloadManualSearchAfterMutation, t],
+  );
 
   const baseOrders = ordersDataSource === "manualSearchApi" ? apiRows : orders;
 
@@ -581,6 +880,75 @@ export default function OrderBoard({
     }
     return filteredOrders.length;
   }, [ordersDataSource, panelFiltered, apiMatchTotal, filteredOrders.length]);
+
+  const handleExcelDownload = useCallback(() => {
+    if (filteredOrders.length === 0) {
+      showToast({ message: t("orders.board.excelExportEmpty"), variant: "warning" });
+      return;
+    }
+    try {
+      const headers = [
+        t("orders.common.orderNumber"),
+        t("orders.common.center"),
+        t("orders.common.applicationType"),
+        t("orders.common.shippingMethod"),
+        t("orders.common.customsClearance"),
+        t("orders.common.membershipCode"),
+        t("orders.common.memberName"),
+        t("orders.common.receiver"),
+        t("orders.common.quantity"),
+        t("orders.common.totalAmount"),
+        t("orders.common.paidAmount"),
+        t("orders.common.weight"),
+        t("orders.common.trackingNumber"),
+        t("orders.common.shipDate"),
+        t("orders.common.rackNumber"),
+        t("orders.common.warehouseStatus"),
+        t("orders.common.progressStatus"),
+        t("orders.common.createdAt"),
+        t("orders.common.updatedAt"),
+      ];
+      const body = filteredOrders.map((o) => {
+        const progressOptions = getProgressSelectOptionsForOrder(o.statusCode, flatStatusItems);
+        const progressVal = resolveProgressSelectValue(
+          o.orderNo,
+          o.statusCode,
+          progressOptions,
+          progressSelectByOrder,
+        );
+        const progressLabel =
+          progressOptions.find((s) => s.code === progressVal)?.label ??
+          o.progressStatus ??
+          o.statusCode ??
+          "";
+        const warehouseVal = warehouseSelectByOrder[o.orderNo] ?? o.warehouseStatus;
+        return [
+          o.orderNo,
+          o.center,
+          o.applicationType,
+          o.shippingMethod,
+          o.customsClearance,
+          o.memberBadge,
+          o.userName,
+          o.receiver,
+          o.qty,
+          o.totalAmount,
+          o.paidAmount,
+          o.weight,
+          o.krTrack,
+          o.shipDate,
+          o.rack,
+          warehouseVal,
+          progressLabel,
+          o.createdAt,
+          o.updatedAt,
+        ];
+      });
+      downloadXlsxFromAoA(title, title, [headers, ...body]);
+    } catch {
+      showToast({ message: t("orders.board.excelExportFailed"), variant: "error" });
+    }
+  }, [filteredOrders, flatStatusItems, progressSelectByOrder, t, title, warehouseSelectByOrder]);
 
   const inboundScanContext = useMemo(() => {
     const o = paginatedOrders[0];
@@ -868,7 +1236,11 @@ export default function OrderBoard({
             
           </div>
           <div className="flex items-center gap-2">
-            <button className="h-8 px-3 text-sm border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleExcelDownload}
+              className="h-8 px-3 text-sm border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1.5"
+            >
               <Download className="w-3.5 h-3.5" />{t("orders.action.excelDownload")}
             </button>
             <button className="h-8 px-3 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1.5">
@@ -960,13 +1332,15 @@ export default function OrderBoard({
                         </div>
                       </div>
                     </td>
-                    {/* Center / Application / Customs */}
-                    <td className="text-center">
-                      <div className="text-[11px] font-medium">{order.center}</div>
-                      <div className="text-[10px] text-gray-500 mt-0.5">{order.applicationType}</div>
-                      <span className="inline-block px-2 py-0.5 text-[10px] bg-sky-100 text-sky-700 rounded-full mt-0.5">
-                        {order.customsClearance}
-                      </span>
+                    {/* 신청구분 / 운송방식 / 통관방식 — API: requesttype, shippingmethod, custommethod */}
+                    <td className="text-center px-1 align-middle">
+                      <div className="text-[11px] font-medium text-amber-900">{order.applicationType || "—"}</div>
+                      <div className="mt-0.5 text-[10px] text-gray-700">{order.shippingMethod || "—"}</div>
+                      <div className="mt-0.5 text-[10px] text-gray-700">
+                        {(order.customsMethod != null && order.customsMethod.trim() !== "" && order.customsMethod !== "—")
+                          ? order.customsMethod
+                          : order.customsClearance || "—"}
+                      </div>
                     </td>
                     {/* Type / Method / Status */}
                     {/* <td className="text-center">
@@ -1009,6 +1383,9 @@ export default function OrderBoard({
                         t={t}
                         progressSelectByOrder={progressSelectByOrder}
                         setProgressSelectByOrder={setProgressSelectByOrder}
+                        onProgressChange={
+                          ordersDataSource === "manualSearchApi" ? handleManualProgressChange : undefined
+                        }
                       />
                     </td>
                     {/* Created / Updated */}
@@ -1030,6 +1407,7 @@ export default function OrderBoard({
                                 key={`${order.orderNo}-${key}`}
                                 type="button"
                                 className={rowActionButtonClass(key)}
+                                onClick={() => handlePurchaseAgencyRowAction(order, key)}
                               >
                                 {t(key)}
                               </button>
@@ -1055,12 +1433,20 @@ export default function OrderBoard({
                         <div className="flex items-center gap-2 text-xs mb-3">
                           <span className="font-bold min-w-[100px]">{t("orders.expanded.orderMemo")}:</span>
                           <input
+                            key={`memo-${order.orderNo}-${order.adminMemo ?? ""}-${order.updatedAt ?? ""}`}
                             type="text"
                             defaultValue={order.adminMemo ?? ""}
                             placeholder={t("orders.expanded.orderMemoPlaceholder")}
                             className="flex-1 h-8 px-3 text-xs border border-gray-300 rounded-md"
+                            ref={(el) => {
+                              memoInputRefs.current[order.orderNo] = el;
+                            }}
                           />
-                          <button className="h-8 px-3 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                          <button
+                            type="button"
+                            className="h-8 px-3 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            onClick={() => void handleAdminMemoRegister(order)}
+                          >
                             {t("orders.action.register")}
                           </button>
                         </div>
@@ -1069,8 +1455,19 @@ export default function OrderBoard({
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <label className="text-xs font-medium text-gray-500">{t("orders.product.trackingInput")}:</label>
-                            <input type="text" placeholder={t("orders.filter.trackingNoPlaceholder")} className="h-8 w-52 px-3 text-xs border border-gray-300 rounded-md" />
-                            <button className="h-8 px-3 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
+                            <input
+                              type="text"
+                              placeholder={t("orders.filter.trackingNoPlaceholder")}
+                              className="h-8 w-52 px-3 text-xs border border-gray-300 rounded-md"
+                              ref={(el) => {
+                                batchTrackingInputRefs.current[order.orderNo] = el;
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="h-8 px-3 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1"
+                              onClick={() => void handleBatchTrackingSave(order)}
+                            >
                               <Save className="w-3 h-3" />{t("orders.product.batchSave")}
                             </button>
                             <button className="h-8 px-3 text-xs border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1">
@@ -1088,7 +1485,7 @@ export default function OrderBoard({
                               ))}
                             </colgroup>
                             <thead>
-                              <tr className="bg-gray-500 text-white">
+                              <tr className="bg-gray-500 text-white text-center">
                                 <th className="text-center text-[11px] font-semibold px-1 py-2 align-middle">
                                   {t("orders.product.productNumber")}
                                 </th>
@@ -1135,7 +1532,12 @@ export default function OrderBoard({
                                       <td className="text-center align-middle px-1 py-2 border border-gray-200">
                                         <div className="flex flex-col items-center gap-1">
                                           <label className="flex items-center justify-center gap-1.5 cursor-pointer">
-                                            <input type="checkbox" className="rounded border-gray-300" />
+                                            <input
+                                              type="checkbox"
+                                              className="rounded border-gray-300"
+                                              checked={productLineSelection[order.orderNo]?.has(p.id) ?? false}
+                                              onChange={() => toggleProductLineSelected(order.orderNo, p.id)}
+                                            />
                                             <span className="text-[12px] font-semibold text-gray-900">{rowNo}</span>
                                           </label>
                                           <button
@@ -1155,7 +1557,7 @@ export default function OrderBoard({
                                       {/* 2 이미지 */}
                                       <td className="text-center align-middle px-1 py-2 border border-gray-200">
                                         <div className="flex flex-col items-center gap-1">
-                                          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded border border-gray-200 bg-slate-100 text-[9px] font-medium text-slate-500">
+                                          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded border border-gray-200 bg-slate-100 text-[9px] font-medium text-slate-500">
                                             {p.image ? (
                                               <img src={p.image} alt="" className="h-full w-full object-cover" />
                                             ) : (
@@ -1177,7 +1579,7 @@ export default function OrderBoard({
                                           {p.option}
                                         </div>
                                       </td>
-                                      {/* 4 트래킹 / 주문번호 */}
+                                      {/* 4 운송장 / 주문번호 */}
                                       <td className="text-center align-middle px-1 py-2 border border-gray-200">
                                         <div className="text-[11px] text-gray-800">
                                           {t("orders.product.trackingNoColon")}:{p.trackingNo || "-"}
@@ -1220,10 +1622,14 @@ export default function OrderBoard({
                                             type="text"
                                             placeholder={t("orders.product.rackNoPlaceholder")}
                                             className="min-w-0 flex-1 rounded border border-gray-300 px-1 py-0.5 text-[11px]"
+                                            ref={(el) => {
+                                              rackInputRefs.current[`${order.orderNo}:::${p.id}`] = el;
+                                            }}
                                           />
                                           <button
                                             type="button"
                                             className="shrink-0 rounded bg-teal-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-teal-700"
+                                            onClick={() => void handleRackLineSave(order, p)}
                                           >
                                             {t("orders.product.rackSave")}
                                           </button>
@@ -1256,23 +1662,42 @@ export default function OrderBoard({
                                             </option>
                                           ))}
                                         </select>
-                                        <div className="mt-1.5 flex flex-col items-center gap-0.5">
-                                          <span className="inline-block min-w-[4.5rem] rounded-sm border border-green-200 bg-green-100 px-1.5 py-0.5 text-center text-[10px] font-medium text-green-900">
-                                            {t("orders.inboundScan.workPending")}
-                                          </span>
-                                          <span className="inline-block min-w-[4.5rem] rounded-sm border border-green-200 bg-green-100 px-1.5 py-0.5 text-center text-[10px] font-medium text-green-900">
-                                            {t("orders.product.labelUnconfirmed")}
-                                          </span>
-                                          <span className="inline-block min-w-[4.5rem] rounded-sm border border-green-200 bg-green-100 px-1.5 py-0.5 text-center text-[10px] font-medium text-green-900">
-                                            {t("orders.action.issueProduct")}
-                                          </span>
-                                        </div>
+                                        {(() => {
+                                          const tags = p.manualStatusTags;
+                                          if (
+                                            !tags ||
+                                            (!tags.workPending && !tags.labelState && !tags.issueProduct)
+                                          ) {
+                                            return null;
+                                          }
+                                          const liClass =
+                                            "inline-block min-w-[4.5rem] rounded-sm border border-green-200 bg-green-100 px-1.5 py-0.5 text-center text-[10px] font-medium text-green-900";
+                                          return (
+                                            <ul className="mt-1.5 m-0 flex list-none flex-col items-center gap-0.5 p-0">
+                                              {tags.workPending ? (
+                                                <li key="wp" className={liClass}>
+                                                  {t("orders.inboundScan.workPending")}
+                                                </li>
+                                              ) : null}
+                                              {tags.labelState ? (
+                                                <li key="ls" className={liClass}>
+                                                  {t("orders.product.labelUnconfirmed")}
+                                                </li>
+                                              ) : null}
+                                              {tags.issueProduct ? (
+                                                <li key="ip" className={liClass}>
+                                                  {t("orders.action.issueProduct")}
+                                                </li>
+                                              ) : null}
+                                            </ul>
+                                          );
+                                        })()}
                                       </td>
                                     </tr>
                                     <tr className="bg-slate-50/90">
                                       <td colSpan={8} className="border border-gray-200 px-3 py-2 align-top">
-                                        <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
-                                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                                        <div className="flex flex-col gap-2 ml-2 lg:flex-row lg:flex-wrap lg:items-center">
+                                          <div className="flex min-w-0  flex-1 items-center gap-2 mx-2">
                                             <span className="shrink-0 text-[11px] font-semibold text-gray-700">
                                               {t("orders.product.productMemo")}
                                             </span>
@@ -1281,15 +1706,19 @@ export default function OrderBoard({
                                               defaultValue={lineProductMemo}
                                               placeholder={t("orders.product.productMemo")}
                                               className="h-7 min-w-0 flex-1 rounded border border-gray-300 px-2 text-[11px]"
+                                              ref={(el) => {
+                                                productMemoInputRefs.current[`${order.orderNo}:::${p.id}`] = el;
+                                              }}
                                             />
                                             <button
                                               type="button"
                                               className="shrink-0 rounded bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+                                              onClick={() => void handleProductMemoLineSave(order, p)}
                                             >
                                               {t("orders.action.register")}
                                             </button>
                                           </div>
-                                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                                          <div className="flex min-w-0  flex-1 items-center gap-2 mx-2">
                                             <span className="shrink-0 text-[11px] font-semibold text-orange-700">
                                               {t("orders.product.caution")}
                                             </span>
@@ -1298,15 +1727,19 @@ export default function OrderBoard({
                                               defaultValue={lineCaution}
                                               placeholder={t("orders.product.caution")}
                                               className="h-7 min-w-0 flex-1 rounded border border-orange-300 bg-white px-2 text-[11px]"
+                                              ref={(el) => {
+                                                cautionInputRefs.current[`${order.orderNo}:::${p.id}`] = el;
+                                              }}
                                             />
-                                            <button
+                                            {/* <button
                                               type="button"
                                               className="shrink-0 rounded bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+                                              onClick={() => void handleCautionLineSave(order, p)}
                                             >
                                               {t("orders.action.register")}
-                                            </button>
+                                            </button> */}
                                           </div>
-                                          <div className="flex min-w-0 flex-[1_1_100%] items-center gap-2 lg:flex-[1_1_40%]">
+                                          <div className="flex min-w-0 flex-1 items-center gap-2 mx-2 ">
                                             <span className="shrink-0 text-[11px] font-semibold text-gray-700">
                                               {t("orders.product.userMemo")}
                                             </span>
@@ -1315,13 +1748,17 @@ export default function OrderBoard({
                                               defaultValue={lineUserMemo}
                                               placeholder={t("orders.product.userMemo")}
                                               className="h-7 min-w-0 flex-1 rounded border border-gray-300 px-2 text-[11px]"
+                                              ref={(el) => {
+                                                userMemoInputRefs.current[`${order.orderNo}:::${p.id}`] = el;
+                                              }}
                                             />
-                                            <button
+                                            {/* <button
                                               type="button"
                                               className="shrink-0 rounded bg-blue-600 px-2 py-1 text-[10px] text-white hover:bg-blue-700"
+                                              onClick={() => void handleUserMemoLineSave(order, p)}
                                             >
                                               {t("orders.action.register")}
-                                            </button>
+                                            </button> */}
                                           </div>
                                         </div>
                                       </td>
@@ -1445,7 +1882,7 @@ export default function OrderBoard({
                               {t("orders.inboundScan.productImage")}
                             </th>
                             <td className="bg-white px-2 py-2">
-                              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-100 text-[10px] text-gray-500">
+                              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-100 text-[10px] text-gray-500">
                                 {inboundScanContext.product.image ? (
                                   <img src={inboundScanContext.product.image} alt="" className="h-full w-full object-cover" />
                                 ) : (

@@ -419,7 +419,33 @@ export function buildOrderViewWindowHtml(order: OrderBoardOrder, L: OrderViewWin
     var SAVED = ${stubSavedJs};
     var SOON = ${stubSoonJs};
     function toast(msg) {
-      try { alert(msg); } catch (e) {}
+      var host = document.getElementById('toastHost');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'toastHost';
+        host.style.position = 'fixed';
+        host.style.top = '12px';
+        host.style.right = '12px';
+        host.style.zIndex = '9999';
+        host.style.display = 'flex';
+        host.style.flexDirection = 'column';
+        host.style.gap = '8px';
+        document.body.appendChild(host);
+      }
+      var el = document.createElement('div');
+      el.textContent = String(msg || '');
+      el.style.background = '#ffffff';
+      el.style.border = '1px solid #cbd5e1';
+      el.style.borderRadius = '8px';
+      el.style.padding = '10px 12px';
+      el.style.boxShadow = '0 8px 20px rgba(15, 23, 42, 0.12)';
+      el.style.fontSize = '12px';
+      el.style.color = '#0f172a';
+      el.style.maxWidth = '320px';
+      host.appendChild(el);
+      setTimeout(function () {
+        try { el.remove(); } catch (e) {}
+      }, 2400);
     }
     document.getElementById('btnClose').addEventListener('click', function () { window.close(); });
     document.getElementById('pvSelectAll').addEventListener('change', function () {

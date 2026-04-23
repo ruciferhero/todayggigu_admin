@@ -84,11 +84,18 @@ export interface OrderViewWindowLabels {
   trackingFilterPlaceholder: string;
 }
 
+/** 상품표 주문번호 열: API `productordernumber` 우선, 없으면 주문 `orderNo`(예: P00000003). */
+function productLineOrderNo(p: OrderBoardProduct): string {
+  const pon = p.productOrderNumber?.trim();
+  return pon && pon.length > 0 ? pon : p.orderNo;
+}
+
 function productRows(order: OrderBoardOrder, L: OrderViewWindowLabels): string {
   const won = L.won;
   return order.products
     .map((p: OrderBoardProduct, pIdx: number) => {
       const rowNo = String(pIdx + 1).padStart(4, "0");
+      const lineOrderNo = productLineOrderNo(p);
       const lineProductMemo = p.productMemo ?? order.productMemo ?? "";
       const lineCaution = p.caution ?? order.caution ?? "";
       const lineUserMemo = p.userMemo ?? order.userMemo ?? "";
@@ -123,8 +130,8 @@ function productRows(order: OrderBoardOrder, L: OrderViewWindowLabels): string {
     <div class="pv-tk">${escapeHtml(L.trackingNoColon)}:${escapeHtml(p.trackingNo || "-")}</div>
     <button type="button" class="pv-borderbtn js-stub">${escapeHtml(L.actualPhoto)}</button>
     <div class="pv-mt"><input type="text" class="pv-inp" value="${escapeHtml(p.trackingNo)}" aria-label="${escapeHtml(L.trackingNoColon)}" /><button type="button" class="pv-btn-teal js-save">${escapeHtml(L.trackingSave)}</button></div>
-    <div class="pv-mt"><button type="button" class="pv-link js-stub">${escapeHtml(p.orderNo)}</button></div>
-    <div class="pv-mt"><input type="text" class="pv-inp" value="${escapeHtml(p.orderNo)}" aria-label="${escapeHtml(L.orderNoLink)}" /><button type="button" class="pv-btn-teal js-save">${escapeHtml(L.orderNoSave)}</button></div>
+    <div class="pv-mt"><button type="button" class="pv-link js-stub">${escapeHtml(lineOrderNo)}</button></div>
+    <div class="pv-mt"><input type="text" class="pv-inp" value="${escapeHtml(lineOrderNo)}" aria-label="${escapeHtml(L.orderNoLink)}" /><button type="button" class="pv-btn-teal js-save">${escapeHtml(L.orderNoSave)}</button></div>
   </td>
   <td class="pv-cell pv-c5">
     <div class="pv-price">${escapeHtml(priceLine1)}</div>

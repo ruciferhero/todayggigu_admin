@@ -15,12 +15,19 @@ function isToolWindowPath(pathname: string | null): boolean {
   );
 }
 
+/** 입고 스캔 팝업 — 가로 메뉴(navigation)만 숨김, Header는 유지 */
+function isInboundScanToolPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname.startsWith("/admin/orders/business/inbound-scan");
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isNavigationVisible, setIsNavigationVisible] = useState(true);
   const hideChrome = isToolWindowPath(pathname);
+  const hideHorizontalMenu = isInboundScanToolPath(pathname);
 
   useEffect(() => {
     if (isLoading) return;
@@ -42,7 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {!hideChrome && (
         <>
           <Header onMenuToggle={() => setIsNavigationVisible((prev) => !prev)} />
-          {isNavigationVisible && <HorizontalMenu />}
+          {isNavigationVisible && !hideHorizontalMenu && <HorizontalMenu />}
         </>
       )}
       <main

@@ -4,6 +4,60 @@ const STORAGE_PREFIX = "obw_order_payload_";
 /** Same-tab backup after moving payload out of `localStorage` (React Strict Mode runs effects twice). */
 const SESSION_HANDOFF_PREFIX = "obw_handoff_";
 
+const INBOUND_SCAN_STORAGE_PREFIX = "obw_inbound_scan_payload_";
+const INBOUND_SCAN_SESSION_PREFIX = "obw_inbound_scan_handoff_";
+
+export type InboundScanWindowPayload = {
+  orders: OrderBoardOrder[];
+  defaultWarehouse: string;
+};
+
+export function storageKeyForInboundScanPayload(token: string): string {
+  return `${INBOUND_SCAN_STORAGE_PREFIX}${token}`;
+}
+
+function inboundScanSessionHandoffKey(token: string): string {
+  return `${INBOUND_SCAN_SESSION_PREFIX}${token}`;
+}
+
+/** 입고 스캔 팝업: `?k=` + 주문표 스냅샷(`orders`) — `localStorage`로 탭 간 전달. */
+export function putInboundScanWindowPayload(payload: InboundScanWindowPayload): string | null {
+  const token =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  try {
+    if (typeof window === "undefined") return null;
+    window.localStorage.setItem(storageKeyForInboundScanPayload(token), JSON.stringify(payload));
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+export function takeInboundScanWindowPayload(token: string | null): InboundScanWindowPayload | null {
+  if (!token) return null;
+  try {
+    if (typeof window === "undefined") return null;
+
+    const ssKey = inboundScanSessionHandoffKey(token);
+    const fromSession = window.sessionStorage.getItem(ssKey);
+    if (fromSession) {
+      return JSON.parse(fromSession) as InboundScanWindowPayload;
+    }
+
+    const lsKey = storageKeyForInboundScanPayload(token);
+    const raw = window.localStorage.getItem(lsKey);
+    if (!raw) return null;
+
+    window.localStorage.removeItem(lsKey);
+    window.sessionStorage.setItem(ssKey, raw);
+    return JSON.parse(raw) as InboundScanWindowPayload;
+  } catch {
+    return null;
+  }
+}
+
 export function storageKeyForOrderBoardPayload(token: string): string {
   return `${STORAGE_PREFIX}${token}`;
 }

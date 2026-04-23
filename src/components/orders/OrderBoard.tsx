@@ -2,14 +2,15 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Camera,
   ChevronDown, ChevronUp, Download, Eye, History, Minus, Plus,
   RotateCcw, Save, Search, Upload, X,
 } from "lucide-react";
 import { useLocale } from "@/contexts/LocaleContext";
 import {
+  deleteAdminOrderById,
   fetchManualOrderProgressCountsOnly,
   fetchManualOrdersSearch,
+  type ManualQuotePersisted,
   patchManualOrderAdminMemo,
   patchManualOrderLineCaution,
   patchManualOrderLineProductMemo,
@@ -17,6 +18,7 @@ import {
   patchManualOrderLineTracking,
   patchManualOrderLineUserMemo,
   patchManualOrderProgress,
+  postAdminManualOrderCopy,
   resolveManualOrderPatchIdentifier,
 } from "@/api/orders/manualSearch";
 import { ApiError } from "@/api/client";
@@ -25,9 +27,11 @@ import {
   resolveProgressSelectValue,
   resolveProgressStatusApiParam,
 } from "./orderBoardProgressColumnOptions";
+import OrderAdditionalServiceModal from "./OrderAdditionalServiceModal";
 import { buildOrderViewWindowHtml, type OrderViewWindowLabels } from "./orderViewWindowDocument";
 import { buildOrderLogWindowHtml, type OrderLogWindowLabels } from "./orderLogWindowDocument";
-import { putOrderBoardWindowPayload } from "@/lib/orderBoardWindowPayload";
+import { putInboundScanWindowPayload, putOrderBoardWindowPayload } from "@/lib/orderBoardWindowPayload";
+import { emitOrderBoardMutationSignal, subscribeOrderBoardMutationSignal } from "@/lib/orderBoardMutationSignal";
 import { downloadXlsxFromAoA } from "@/lib/excelDownload";
 import { showToast } from "@/lib/toast";
 
@@ -60,6 +64,23 @@ export interface OrderBoardProduct {
   productMemo?: string;
   caution?: string;
   userMemo?: string;
+  /** `GET/PATCH …/manual` 라인 `inspectionImages` — 실사검수 이미지 URL */
+  inspectionImages?: string[];
+  /** `GET …/manual` 라인 `addservices` */
+  additionalServices?: Array<{
+    addServiceId: string;
+    name: string;
+    serviceType?: string;
+    quantity?: number;
+    price?: number;
+    note?: string;
+    icon?: string;
+    imageUrl?: string;
+  }>;
+  /** `productordernumber` — 상품표 번호 */
+  productOrderNumber?: string;
+  /** `sellershippingcost` — 운비(원) */
+  sellerShippingCost?: number;
   /**
    * `GET …/orders/manual/search` 주문·라인 필드 `workPending` / `labelstate` / `issueproduct`.
    * 값이 `yes`인 항목만 상품 행 태그 `<ul>`에 표시.
@@ -107,6 +128,19 @@ export interface OrderBoardOrder {
   products: OrderBoardProduct[];
   /** `PATCH …/orders/manual/:id` — 있으면 Mongo `_id`(Postman), 없으면 `orderNo`로 PATCH */
   manualOrderPatchId?: string;
+  /** API `dispatchmethod` / `dispatchmethodship` 등 — 구매비용 PATCH `purchaseMethod`에 사용 */
+  manualPurchaseMethod?: string;
+  /** `GET manual/search` 행에 포함된 구매비용 필드(팝업 초기값·목록 동기화) */
+  manualQuotePersisted?: ManualQuotePersisted;
+  /** `GET/PATCH …/manual` — 부가서비스 매핑(`items[].offerId` + `items[].addservices[]`) */
+  additionalServiceItems?: Array<{
+    offerId: string;
+    addservices: string[];
+  }>;
+  /** 구형 스키마 폴백: `additionalServiceIds` */
+  additionalServiceIds?: string[];
+  /** 구형 스키마 폴백: `additionalServices` */
+  additionalServices?: string[];
 }
 
 interface Props {
@@ -198,10 +232,10 @@ function clampPopupSize(n: number, lo: number, hi: number): number {
  * 주문문의: 내용(`max-w-6xl`, 상품표 `min-w-[900px]`) 비율은 유지하고 화면에 맞게 가변.
  * 구매비용: 기존 고정 크기.
  */
-function agencyToolPopupDimensions(segment: "order-inquiry" | "purchase-cost"): { w: number; h: number } {
+function agencyToolPopupDimensions(segment: "order-inquiry" | "purchase-cost" | "inbound-scan"): { w: number; h: number } {
   const aw = window.screen.availWidth;
   const ah = window.screen.availHeight;
-  if (segment === "purchase-cost") {
+  if (segment === "purchase-cost" || segment === "inbound-scan") {
     return { w: 920, h: 720 };
   }
   const w = clampPopupSize(Math.round(aw * 0.88), 960, 1180);
@@ -381,7 +415,7 @@ export default function OrderBoard({
   );
 
   const handlePurchaseAgencyRowAction = useCallback(
-    (order: OrderBoardOrder, labelKey: string) => {
+    async (order: OrderBoardOrder, labelKey: string) => {
       if (labelKey === "orders.rowAction.orderInquiry") {
         openPurchaseAgencyToolTab(order, "order-inquiry");
         return;
@@ -390,8 +424,30 @@ export default function OrderBoard({
         openPurchaseAgencyToolTab(order, "purchase-cost");
         return;
       }
+      try {
+        if (labelKey === "orders.rowAction.orderCopy") {
+          const ok = window.confirm(t("orders.board.orderCopyConfirm"));
+          if (!ok) return;
+          await postAdminManualOrderCopy(order);
+          showToast({ message: t("orders.board.orderCopySuccess"), variant: "success" });
+          window.location.reload();
+          return;
+        }
+        if (labelKey === "orders.rowAction.delete") {
+          const ok = window.confirm(t("orders.board.orderDeleteConfirm"));
+          if (!ok) return;
+          await deleteAdminOrderById(order);
+          showToast({ message: t("orders.board.orderDeleteSuccess"), variant: "success" });
+          window.location.reload();
+        }
+      } catch (e) {
+        showToast({
+          message: e instanceof ApiError ? e.message : t("orders.board.manualPatchFailed"),
+          variant: "error",
+        });
+      }
     },
-    [openPurchaseAgencyToolTab],
+    [openPurchaseAgencyToolTab, t],
   );
 
   const openOrderViewWindow = (order: OrderBoardOrder) => {
@@ -517,9 +573,10 @@ export default function OrderBoard({
   const [pageSize, setPageSize] = useState(50);
   const [filterDraft, setFilterDraft] = useState<OrderBoardSearchFilters>(emptyOrderBoardSearchFilters);
   const [filterApplied, setFilterApplied] = useState<OrderBoardSearchFilters>(emptyOrderBoardSearchFilters);
-  const [inboundScanOpen, setInboundScanOpen] = useState(false);
   /** Row-local 입고상태 / 진행상태 select 값 (서버 반영 전 UI만) */
   const [warehouseSelectByOrder, setWarehouseSelectByOrder] = useState<Record<string, string>>({});
+  /** Expanded 상품표의 상품상태 select 값 (라인별 독립 상태) */
+  const [warehouseSelectByLine, setWarehouseSelectByLine] = useState<Record<string, string>>({});
   const [progressSelectByOrder, setProgressSelectByOrder] = useState<Record<string, string>>({});
   /** 확장 행: `orderNo` → 선택된 상품 라인 `product.id` */
   const [productLineSelection, setProductLineSelection] = useState<Record<string, Set<string>>>({});
@@ -529,6 +586,12 @@ export default function OrderBoard({
   const [apiTotalPages, setApiTotalPages] = useState(1);
   /** Total rows matching current server query (for header/footer when not using panel filters). */
   const [apiMatchTotal, setApiMatchTotal] = useState<number | null>(null);
+  const [hoverPreviewImage, setHoverPreviewImage] = useState<string | null>(null);
+  /** 부가서비스 모달 — 열 때 상품 체크 스냅샷을 고정해 두고 PATCH에 전달 */
+  const [addServiceModal, setAddServiceModal] = useState<{
+    order: OrderBoardOrder;
+    productIds: string[];
+  } | null>(null);
   const apiExpandInit = useRef(false);
   const memoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const batchTrackingInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -639,17 +702,16 @@ export default function OrderBoard({
     async (order: OrderBoardOrder) => {
       if (ordersDataSource !== "manualSearchApi") return;
       const sel = productLineSelection[order.orderNo];
-      if (!sel?.size) {
-        showToast({ message: t("orders.board.batchSaveNoSelection"), variant: "warning" });
-        return;
-      }
+      const targetIds =
+        sel && sel.size > 0 ? [...sel] : order.products.map((p) => p.id);
+      if (targetIds.length === 0) return;
       const tn = batchTrackingInputRefs.current[order.orderNo]?.value?.trim() ?? "";
       if (!tn) {
         showToast({ message: t("orders.board.batchSaveTrackingEmpty"), variant: "warning" });
         return;
       }
       try {
-        for (const pid of sel) {
+        for (const pid of targetIds) {
           const p = order.products.find((x) => x.id === pid);
           if (p) await patchManualOrderLineTracking(order, p, tn);
         }
@@ -814,6 +876,26 @@ export default function OrderBoard({
     setExpandedProducts(new Set([apiRows[0].orderNo]));
   }, [ordersDataSource, apiRows]);
 
+  /** Popup(구매비용/주문문의) 저장 후 메인 보드 즉시 동기화 */
+  useEffect(() => {
+    if (ordersDataSource !== "manualSearchApi") return;
+    return subscribeOrderBoardMutationSignal(() => {
+      void reloadManualSearchAfterMutation();
+    });
+  }, [ordersDataSource, reloadManualSearchAfterMutation]);
+
+  /** 팝업 창이 `postMessage`로 알릴 때(일부 브라우저에서 `storage`만으로는 부모가 못 받는 경우) */
+  useEffect(() => {
+    if (ordersDataSource !== "manualSearchApi") return;
+    const onMessage = (ev: MessageEvent) => {
+      if (ev.origin !== window.location.origin) return;
+      const d = ev.data as { type?: string };
+      if (d?.type === "todayggigu:manual-order-mutated") void reloadManualSearchAfterMutation();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [ordersDataSource, reloadManualSearchAfterMutation]);
+
   const warehouseSelectOptions = useMemo(
     () => [
       t("orders.status.warehouseInProgress"),
@@ -950,12 +1032,34 @@ export default function OrderBoard({
     }
   }, [filteredOrders, flatStatusItems, progressSelectByOrder, t, title, warehouseSelectByOrder]);
 
-  const inboundScanContext = useMemo(() => {
-    const o = paginatedOrders[0];
-    const p = o?.products[0];
-    if (!o || !p) return null;
-    return { order: o, product: p };
-  }, [paginatedOrders]);
+  const openInboundScanShellWindow = useCallback(() => {
+    const token = putInboundScanWindowPayload({
+      orders: filteredOrders,
+      defaultWarehouse: filterApplied.center || "",
+    });
+    if (!token) return;
+    const path = `/admin/orders/business/inbound-scan?k=${encodeURIComponent(token)}`;
+    const url = `${window.location.origin}${path}`;
+    const { w, h } = agencyToolPopupDimensions("inbound-scan");
+    const left = Math.max(0, Math.floor((window.screen.availWidth - w) / 2));
+    const top = Math.max(0, Math.floor((window.screen.availHeight - h) / 2));
+    const features = [
+      `width=${w}`,
+      `height=${h}`,
+      `left=${left}`,
+      `top=${top}`,
+      "scrollbars=yes",
+      "resizable=yes",
+      "menubar=no",
+      "toolbar=no",
+    ].join(",");
+    const popup = window.open(url, "_blank", features);
+    if (!popup) {
+      showToast({ message: t("orders.inboundScan.popupBlocked"), variant: "error" });
+      return;
+    }
+    popup.opener = null;
+  }, [filterApplied.center, filteredOrders, t]);
 
   /* helpers */
   const toggle = (orderNo: string) =>
@@ -1059,7 +1163,7 @@ export default function OrderBoard({
         ))}
       </div>
 
-      {/* ── Quick action buttons (data-inbound-scan opens modal) ─── */}
+      {/* ── Quick action buttons (data-inbound-scan opens inbound scan window) ─── */}
       {actionButtons && (
         <div
           className="flex gap-2 flex-wrap"
@@ -1067,7 +1171,7 @@ export default function OrderBoard({
             if ((e.target as HTMLElement).closest("[data-inbound-scan]")) {
               e.preventDefault();
               e.stopPropagation();
-              setInboundScanOpen(true);
+              openInboundScanShellWindow();
             }
           }}
         >
@@ -1285,7 +1389,7 @@ export default function OrderBoard({
                   <div>({t("orders.common.weight")})</div>
                 </th>
                 <th className="text-center">
-                  <div>{t("orders.common.trackingNumber")}</div>
+                  <div>{t("orders.common.trackingNumber_intel")}</div>
                   <div>{t("orders.common.rackNumber")}</div>
                 </th>
                 <th className="text-center">
@@ -1470,7 +1574,24 @@ export default function OrderBoard({
                             >
                               <Save className="w-3 h-3" />{t("orders.product.batchSave")}
                             </button>
-                            <button className="h-8 px-3 text-xs border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1">
+                            <button
+                              type="button"
+                              className="h-8 px-3 text-xs border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-1"
+                              onClick={() => {
+                                const n = productLineSelection[order.orderNo]?.size ?? 0;
+                                if (n < 1) {
+                                  showToast({
+                                    message: t("orders.product.addServiceNeedProductSelection"),
+                                    variant: "warning",
+                                  });
+                                  return;
+                                }
+                                setAddServiceModal({
+                                  order,
+                                  productIds: [...(productLineSelection[order.orderNo] ?? [])],
+                                });
+                              }}
+                            >
                               <Plus className="w-3 h-3" />{t("orders.product.addAdditionalService")}
                             </button>
                           </div>
@@ -1557,19 +1678,62 @@ export default function OrderBoard({
                                       {/* 2 이미지 */}
                                       <td className="text-center align-middle px-1 py-2 border border-gray-200">
                                         <div className="flex flex-col items-center gap-1">
-                                          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded border border-gray-200 bg-slate-100 text-[9px] font-medium text-slate-500">
+                                          <div
+                                            className="flex h-20 w-20 cursor-zoom-in items-center justify-center overflow-hidden rounded border border-gray-200 bg-slate-100 text-[9px] font-medium text-slate-500"
+                                            onMouseEnter={() => {
+                                              if (p.image) setHoverPreviewImage(p.image);
+                                            }}
+                                            onMouseLeave={() => setHoverPreviewImage(null)}
+                                          >
                                             {p.image ? (
                                               <img src={p.image} alt="" className="h-full w-full object-cover" />
                                             ) : (
                                               "IMG"
                                             )}
                                           </div>
+                                          {p.inspectionImages && p.inspectionImages.length > 0 ? (
+                                            <div className="flex max-w-[5.5rem] flex-wrap justify-center gap-0.5">
+                                              {p.inspectionImages.slice(0, 4).map((src) => (
+                                                <button
+                                                  key={src}
+                                                  type="button"
+                                                  className="h-8 w-8 shrink-0 overflow-hidden rounded border border-gray-200 bg-slate-50"
+                                                  onMouseEnter={() => setHoverPreviewImage(src)}
+                                                  onMouseLeave={() => setHoverPreviewImage(null)}
+                                                >
+                                                  <img src={src} alt="" className="h-full w-full object-cover" />
+                                                </button>
+                                              ))}
+                                            </div>
+                                          ) : null}
                                           <button
                                             type="button"
                                             className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[10px] text-gray-800 hover:bg-gray-50"
                                           >
                                             {t("orders.product.labelPrint")}
                                           </button>
+                                          {p.additionalServices && p.additionalServices.length > 0 ? (
+                                            <div className="mt-1 flex w-full max-w-[6.25rem] items-center gap-0.5 overflow-x-auto whitespace-nowrap rounded border border-orange-200 bg-orange-50 p-0.5">
+                                              {p.additionalServices.map((svc) => (
+                                                <span
+                                                  key={`${p.id}-${svc.addServiceId}`}
+                                                  className="inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded border border-orange-200 bg-white"
+                                                  title={`${svc.name}${
+                                                    typeof svc.price === "number"
+                                                      ? ` (${t("orders.common.won")}${svc.price.toLocaleString()})`
+                                                      : ""
+                                                  }${svc.note ? ` - ${svc.note}` : ""}`}
+                                                >
+                                                  {svc.icon ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img src={svc.icon} alt="" className="h-full w-full object-cover" />
+                                                  ) : (
+                                                    <span className="h-2 w-2 rounded bg-orange-300" />
+                                                  )}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : null}
                                         </div>
                                       </td>
                                       {/* 3 상품명 / 옵션 */}
@@ -1595,7 +1759,7 @@ export default function OrderBoard({
                                             type="button"
                                             className="break-all text-[11px] font-medium text-blue-600 underline decoration-blue-400 hover:text-blue-800"
                                           >
-                                            {p.orderNo}
+                                            {p.productOrderNumber?.trim() || p.orderNo}
                                           </button>
                                         </div>
                                       </td>
@@ -1606,11 +1770,22 @@ export default function OrderBoard({
                                       </td>
                                       {/* 6 운비 */}
                                       <td className="text-center align-middle px-1 py-2 border border-gray-200">
-                                        <input
+                                        {typeof p.sellerShippingCost === "number" &&
+                                        Number.isFinite(p.sellerShippingCost) ? (
+                                          <div className="mb-0.5 text-[10px] leading-tight text-red-400">
+                                            {t("orders.product.sellerShippingCost")}: {won}
+                                            {p.sellerShippingCost.toLocaleString()}
+                                          </div>
+                                        ) : null}
+                                        <div className="mb-0.5 text-[10px] leading-tight text-gray-500">
+                                          {t("orders.product.actualShippingCost")}: {won}
+                                          {p.shippingCost.toLocaleString()}
+                                        </div>
+                                        {/* <input
                                           type="text"
                                           defaultValue={`${won} ${p.shippingCost.toLocaleString()}`}
-                                          className="w-full max-w-[7rem] rounded border border-gray-300 bg-gray-100 py-1 text-center text-[11px] text-gray-800 mx-auto block"
-                                        />
+                                          className="mx-auto block w-full max-w-[7rem] rounded border border-gray-300 bg-gray-100 py-1 text-center text-[11px] text-gray-800"
+                                        /> */}
                                       </td>
                                       {/* 7 랙번호 */}
                                       <td className="text-left align-middle px-1 py-2 border border-gray-200">
@@ -1640,19 +1815,24 @@ export default function OrderBoard({
                                       </td>
                                       {/* 8 상품상태 */}
                                       <td className="text-center align-middle px-1 py-2 border border-gray-200">
+                                       {(() => {
+                                          const lineKey = `${order.orderNo}:::${p.id}`;
+                                          const lineStatusBase =
+                                            (typeof p.statusLabel === "string" && p.statusLabel.trim()) || order.warehouseStatus;
+                                          return (
                                        <select
                                           className="mx-auto mb-1 block w-full max-w-[10rem] text-[10px] leading-snug border border-gray-300 rounded-md py-1 px-1 bg-green-50 text-green-800"
                                           aria-label={t("orders.common.warehouseStatus")}
                                           value={
-                                            warehouseSelectByOrder[order.orderNo] ??
-                                            (warehouseSelectChoices.includes(order.warehouseStatus)
-                                              ? order.warehouseStatus
+                                            warehouseSelectByLine[lineKey] ??
+                                            (warehouseSelectChoices.includes(lineStatusBase)
+                                              ? lineStatusBase
                                               : (warehouseSelectChoices[0] ?? ""))
                                           }
                                           onChange={(e) =>
-                                            setWarehouseSelectByOrder((prev) => ({
+                                            setWarehouseSelectByLine((prev) => ({
                                               ...prev,
-                                              [order.orderNo]: e.target.value,
+                                              [lineKey]: e.target.value,
                                             }))
                                           }
                                         >
@@ -1662,6 +1842,8 @@ export default function OrderBoard({
                                             </option>
                                           ))}
                                         </select>
+                                          );
+                                        })()}
                                         {(() => {
                                           const tags = p.manualStatusTags;
                                           if (
@@ -1799,198 +1981,28 @@ export default function OrderBoard({
         )}
       </div>
 
-      {inboundScanOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="inbound-scan-modal-title"
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setInboundScanOpen(false)}
-        >
-          <div
-            className="w-full max-w-sm max-h-[92vh] overflow-hidden rounded-xl border border-gray-300 bg-white shadow-xl flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              id="inbound-scan-modal-title"
-              className="border-b border-gray-200 bg-gray-50 px-3 py-2.5 text-center text-sm font-semibold text-gray-900"
-            >
-              {t("orders.action.warehouseScan")}
-            </div>
-            <div className="overflow-y-auto p-3 space-y-3">
-              <button
-                type="button"
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-500 px-3 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-teal-600"
-              >
-                <Camera className="h-4 w-4 shrink-0" />
-                {t("orders.inboundScan.takePhoto")}
-              </button>
-              <button
-                type="button"
-                className="flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100"
-              >
-                <Upload className="h-6 w-6" />
-                <span className="text-xs font-medium">{t("orders.inboundScan.upload")}</span>
-              </button>
-              <button
-                type="button"
-                className="w-full rounded-lg bg-gray-200 py-3 text-sm font-semibold text-gray-800 shadow-inner hover:bg-gray-300"
-              >
-                {t("orders.inboundScan.inboundComplete")}
-              </button>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className="rounded-lg bg-gray-200 py-2.5 text-xs font-semibold text-gray-800 hover:bg-gray-300"
-                >
-                  {t("orders.inboundScan.workPending")}
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg bg-gray-200 py-2.5 text-xs font-semibold text-gray-800 hover:bg-gray-300"
-                >
-                  {t("orders.inboundScan.issuePhoto")}
-                </button>
-              </div>
+      <OrderAdditionalServiceModal
+        open={addServiceModal != null}
+        order={addServiceModal?.order ?? null}
+        selectedProductIds={addServiceModal?.productIds ?? []}
+        onClose={() => setAddServiceModal(null)}
+        onApplied={(orderNo) => {
+          emitOrderBoardMutationSignal({
+            orderNo,
+            at: Date.now(),
+            source: "additional-services",
+          });
+          void reloadManualSearchAfterMutation();
+        }}
+      />
 
-              {inboundScanContext ? (
-                <>
-                  <p className="text-center text-xs text-gray-800">
-                    <span className="text-gray-600">{t("orders.common.orderNumber")}</span>
-                    <span className="mx-1">:</span>
-                    <span className="font-bold text-red-600">{inboundScanContext.order.orderNo}</span>
-                  </p>
-                  <div className="flex gap-2 rounded-lg border border-gray-200 bg-white p-2">
-                    
-                    <div className="min-w-0 flex-1 overflow-hidden rounded-md border border-gray-200">
-                      <table className="w-full border-collapse text-xs">
-                        <tbody>
-                          <tr className="border-b border-gray-200">
-                            <th className="w-[38%] border-r border-gray-200 bg-gray-100 px-2 py-2 text-left font-medium text-gray-700">
-                              {t("orders.product.productNumber")}
-                            </th>
-                            <td className="bg-white px-2 py-2 text-gray-900">{inboundScanContext.product.productNo}</td>
-                          </tr>
-                          <tr className="border-b border-gray-200">
-                            <th className="border-r border-gray-200 bg-gray-100 px-2 py-2 text-left font-medium text-gray-700">
-                              {t("orders.inboundScan.productName")}
-                            </th>
-                            <td className="bg-white px-2 py-2 text-gray-900">{inboundScanContext.product.name}</td>
-                          </tr>
-                          <tr className="border-b border-gray-200">
-                            <th className="border-r border-gray-200 bg-gray-100 px-2 py-2 text-left font-medium text-gray-700">
-                              {t("orders.inboundScan.productImage")}
-                            </th>
-                            <td className="bg-white px-2 py-2">
-                              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-100 text-[10px] text-gray-500">
-                                {inboundScanContext.product.image ? (
-                                  <img src={inboundScanContext.product.image} alt="" className="h-full w-full object-cover" />
-                                ) : (
-                                  "IMG"
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                          <tr className="border-b border-gray-200">
-                            <th className="border-r border-gray-200 bg-gray-100 px-2 py-2 text-left font-medium text-gray-700">
-                              {t("orders.inboundScan.colorSize")}
-                            </th>
-                            <td className="bg-white px-2 py-2 text-gray-800">{inboundScanContext.product.option}</td>
-                          </tr>
-                          <tr className="border-b border-gray-200">
-                            <th className="border-r border-gray-200 bg-gray-100 px-2 py-2 text-left font-medium text-gray-700">
-                              {t("orders.common.quantity")}
-                            </th>
-                            <td className="bg-white px-2 py-2 text-gray-900">{inboundScanContext.product.quantity}</td>
-                          </tr>
-                          <tr className="border-b border-gray-200">
-                            <th className="border-r border-gray-200 bg-gray-100 px-2 py-2 text-left font-medium text-gray-700">
-                              {t("orders.inboundScan.barcode")}
-                            </th>
-                            <td className="bg-white px-2 py-2">
-                              <input
-                                type="text"
-                                defaultValue="s123456789"
-                                className="h-8 w-full rounded border border-gray-300 px-2 text-xs"
-                              />
-                            </td>
-                          </tr>
-                          <tr className="border-b border-gray-200">
-                            <th className="border-r border-gray-200 bg-gray-100 px-2 py-2 text-left font-medium text-gray-700">
-                              {t("orders.inboundScan.barcodePhoto")}
-                            </th>
-                            <td className="bg-white px-2 py-2">
-                              <button
-                                type="button"
-                                className="flex min-h-[4rem] w-full flex-col items-center justify-center gap-1 rounded border-2 border-dashed border-orange-300 bg-orange-50/50 text-orange-700 hover:bg-orange-50"
-                              >
-                                <Plus className="h-5 w-5" />
-                                <span className="text-[11px] font-medium">{t("orders.inboundScan.imageUpload")}</span>
-                              </button>
-                            </td>
-                          </tr>
-                          <tr className="border-b border-gray-200">
-                            <th className="border-r border-gray-200 bg-gray-100 px-2 py-2 text-left font-medium text-gray-700">
-                              {t("orders.product.productMemo")}
-                            </th>
-                            <td className="px-2 py-2">
-                              <input
-                                type="text"
-                                defaultValue={
-                                  inboundScanContext.product.productMemo ??
-                                  inboundScanContext.order.productMemo ??
-                                  ""
-                                }
-                                placeholder={t("orders.product.productMemo")}
-                                className="h-8 w-full rounded border border-gray-300 px-2 text-xs"
-                              />
-                            </td>
-                          </tr>
-                          <tr className="border-b border-gray-200">
-                            <th className="border-r border-gray-200 bg-gray-100 px-2 py-2 text-left font-medium text-gray-700">
-                              {t("orders.common.status")}
-                            </th>
-                            <td className="bg-white px-2 py-2">
-                              <select className="h-8 w-full rounded border border-gray-300 bg-white px-2 text-xs">
-                                <option>{t("orders.status.warehouseInComplete")}</option>
-                                <option>{t("orders.status.warehouseInProgress")}</option>
-                              </select>
-                            </td>
-                          </tr>
-                          <tr>
-                            <th className="border-r border-gray-200 bg-gray-100 px-2 py-2 align-top text-left font-medium text-gray-700">
-                              {t("orders.inboundScan.orderNoBracket").replace(
-                                "{{no}}",
-                                inboundScanContext.order.orderNo,
-                              )}
-                            </th>
-                            <td className="bg-white px-2 py-2">
-                              <textarea
-                                rows={3}
-                                defaultValue={`${inboundScanContext.product.productNo}-26包邮》等卖家改价 /`}
-                                className="w-full resize-y rounded border border-gray-300 px-2 py-1.5 text-xs"
-                              />
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <p className="py-6 text-center text-xs text-gray-500">{t("orders.inboundScan.noProductSample")}</p>
-              )}
-            </div>
-            <div className="border-t border-gray-200 bg-gray-50 px-3 py-2.5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setInboundScanOpen(false)}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-              >
-                {t("orders.common.close")}
-              </button>
-            </div>
-          </div>
+      {hoverPreviewImage && (
+        <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-8">
+          <img
+            src={hoverPreviewImage}
+            alt=""
+            className="max-h-[85vh] max-w-[85vw] rounded-md bg-white/95 p-1 shadow-2xl object-contain"
+          />
         </div>
       )}
 

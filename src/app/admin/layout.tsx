@@ -15,10 +15,13 @@ function isToolWindowPath(pathname: string | null): boolean {
   );
 }
 
-/** 입고 스캔 팝업 — 가로 메뉴(navigation)만 숨김, Header는 유지 */
+/** 입고 스캔·이슈 사진 팝업 — 가로 메뉴(navigation)만 숨김, Header는 유지 */
 function isInboundScanToolPath(pathname: string | null): boolean {
   if (!pathname) return false;
-  return pathname.startsWith("/admin/orders/business/inbound-scan");
+  return (
+    pathname.startsWith("/admin/orders/business/inbound-scan") ||
+    pathname.startsWith("/admin/orders/business/issue-photo")
+  );
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

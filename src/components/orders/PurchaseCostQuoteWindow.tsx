@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/api/client";
 import {
   decodeManualPurchaseQuoteFromApiOrder,
@@ -9,6 +9,7 @@ import {
   patchManualOrderLineShippingCost,
   patchManualOrderPurchaseQuote,
 } from "@/api/orders/manualSearch";
+import { fetchAdditionalFxSettings, fetchExchangeRatesSettings } from "@/api/settings/exchangeTax";
 import type { OrderBoardOrder, OrderBoardProduct } from "@/components/orders/OrderBoard";
 import {
   agencyKvLabelTd,
@@ -117,8 +118,8 @@ export default function PurchaseCostQuoteWindow({ order }: { order: OrderBoardOr
   const [savingQuote, setSavingQuote] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [fxWonPerYuan, setFxWonPerYuan] = useState(initialQuote.fxWonPerYuan);
-  const govRate = 216.84;
-  const extraFx = 15;
+  const [govRate, setGovRate] = useState(216.84);
+  const [extraFx, setExtraFx] = useState(15);
   const [productCostYuan, setProductCostYuan] = useState(initialQuote.productCostYuan);
   const [feeYuan, setFeeYuan] = useState(initialQuote.feeYuan);
   const [feePct, setFeePct] = useState(initialQuote.feePct);
@@ -129,6 +130,29 @@ export default function PurchaseCostQuoteWindow({ order }: { order: OrderBoardOr
   const [excessWon, setExcessWon] = useState(initialQuote.excessWon);
   const [includeExcess, setIncludeExcess] = useState(initialQuote.includeExcess);
   const [adminMemo, setAdminMemo] = useState(order.adminMemo ?? "");
+
+  useEffect(() => {
+    let mounted = true;
+    void (async () => {
+      const [exchangeRes, additionalRes] = await Promise.allSettled([
+        fetchExchangeRatesSettings(),
+        fetchAdditionalFxSettings(),
+      ]);
+      if (!mounted) return;
+
+      if (exchangeRes.status === "fulfilled") {
+        const cny = Number(exchangeRes.value.cnyRate);
+        if (Number.isFinite(cny)) setGovRate(cny);
+      }
+      if (additionalRes.status === "fulfilled") {
+        const addCny = Number(additionalRes.value.cnyAdditionalFxMargin);
+        if (Number.isFinite(addCny)) setExtraFx(addCny);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const lineLocalSum = useMemo(
     () => products.reduce((s, p) => s + (p.shippingCost || 0), 0),

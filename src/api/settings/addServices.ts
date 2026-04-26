@@ -3,11 +3,16 @@ import { ApiError, getToken } from "@/api/client";
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 function apiPath(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
   const raw = (process.env.NEXT_PUBLIC_API_VERSION || "").trim();
   const v = raw.replace(/^\/+|\/+$/g, "");
-  const p = path.startsWith("/") ? path : `/${path}`;
+  const p = (path.startsWith("/") ? path : `/${path}`).replace(/\/{2,}/g, "/");
   if (!v) return p;
-  return `/${v}${p}`;
+  const norm = p.replace(/^\/+/, "");
+  const lowerNorm = norm.toLowerCase();
+  const lowerV = v.toLowerCase();
+  if (lowerNorm === lowerV || lowerNorm.startsWith(`${lowerV}/`)) return `/${norm}`;
+  return `/${v}/${norm}`;
 }
 
 export type AddServiceResponse = {

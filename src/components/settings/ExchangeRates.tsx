@@ -4,75 +4,101 @@ import { Info, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/api/client";
 import {
-  fetchExchangeTaxSettings,
-  updateDutySettings,
+  fetchAdditionalFxSettings,
+  fetchExchangeRatesSettings,
+  updateAdditionalFxSettings,
   updateExchangeRatesSettings,
-  type ExchangeTaxSettings,
+  type AdditionalFxSettings,
+  type ExchangeRateSettings,
 } from "@/api/settings/exchangeTax";
 import { showToast } from "@/lib/toast";
 
 export default function ExchangeRates() {
   const [cnyRate, setCnyRate] = useState("255");
   const [usdRate, setUsdRate] = useState("7");
-  const [basicDuty, setBasicDuty] = useState("0");
-  const [vatDuty, setVatDuty] = useState("0");
-  const [specialDuty, setSpecialDuty] = useState("");
-  const [initialSettings, setInitialSettings] = useState<ExchangeTaxSettings>({
+  const [cnyAdditionalFx, setCnyAdditionalFx] = useState("0");
+  const [usdAdditionalFx, setUsdAdditionalFx] = useState("0");
+  const [initialExchange, setInitialExchange] = useState<ExchangeRateSettings>({
     cnyRate: "255",
     usdRate: "7",
-    basicDuty: "0",
-    vatDuty: "0",
-    specialDuty: "",
+  });
+  const [initialAdditionalFx, setInitialAdditionalFx] = useState<AdditionalFxSettings>({
+    cnyAdditionalFxMargin: "0",
+    usdAdditionalFxMargin: "0",
   });
   const [loading, setLoading] = useState(true);
   const [savingExchange, setSavingExchange] = useState(false);
-  const [savingDuty, setSavingDuty] = useState(false);
+  const [savingAdditional, setSavingAdditional] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     void (async () => {
       setLoading(true);
-      try {
-        const s = await fetchExchangeTaxSettings();
-        if (!mounted) return;
+      const [exchangeRes, additionalRes] = await Promise.allSettled([
+        fetchExchangeRatesSettings(),
+        fetchAdditionalFxSettings(),
+      ]);
+      if (!mounted) return;
+
+      if (exchangeRes.status === "fulfilled") {
+        const s = exchangeRes.value;
         setCnyRate(s.cnyRate);
         setUsdRate(s.usdRate);
-        setBasicDuty(s.basicDuty);
-        setVatDuty(s.vatDuty);
-        setSpecialDuty(s.specialDuty);
-        setInitialSettings(s);
-      } catch (e) {
-        const msg = e instanceof ApiError ? e.message : "환율/관세 설정을 불러오지 못했습니다.";
+        setInitialExchange(s);
+      } else {
+        const msg = exchangeRes.reason instanceof ApiError
+          ? exchangeRes.reason.message
+          : "환율 설정을 불러오지 못했습니다.";
         showToast({ message: msg, variant: "error" });
-      } finally {
-        if (mounted) setLoading(false);
       }
+
+      if (additionalRes.status === "fulfilled") {
+        const s = additionalRes.value;
+        setCnyAdditionalFx(s.cnyAdditionalFxMargin);
+        setUsdAdditionalFx(s.usdAdditionalFxMargin);
+        setInitialAdditionalFx(s);
+      } else {
+        const msg = additionalRes.reason instanceof ApiError
+          ? additionalRes.reason.message
+          : "추가환율금액 설정을 불러오지 못했습니다.";
+        showToast({ message: msg, variant: "error" });
+      }
+
+      setLoading(false);
     })();
     return () => {
       mounted = false;
     };
   }, []);
 
-  const currentSettings = useMemo<ExchangeTaxSettings>(
+  const currentExchangeSettings = useMemo<ExchangeRateSettings>(
     () => ({
       cnyRate: cnyRate.trim(),
       usdRate: usdRate.trim(),
-      basicDuty: basicDuty.trim(),
-      vatDuty: vatDuty.trim(),
-      specialDuty: specialDuty.trim(),
     }),
-    [basicDuty, cnyRate, specialDuty, usdRate, vatDuty],
+    [cnyRate, usdRate],
+  );
+
+  const currentAdditionalSettings = useMemo<AdditionalFxSettings>(
+    () => ({
+      cnyAdditionalFxMargin: cnyAdditionalFx.trim(),
+      usdAdditionalFxMargin: usdAdditionalFx.trim(),
+    }),
+    [cnyAdditionalFx, usdAdditionalFx],
   );
 
   const onSaveExchange = async () => {
-    if (!currentSettings.cnyRate || !currentSettings.usdRate) {
+    if (!currentExchangeSettings.cnyRate || !currentExchangeSettings.usdRate) {
       showToast({ message: "환율을 입력하세요.", variant: "warning" });
       return;
     }
     setSavingExchange(true);
     try {
-      await updateExchangeRatesSettings(currentSettings);
-      setInitialSettings(currentSettings);
+      await updateExchangeRatesSettings(currentExchangeSettings);
+      const refreshed = await fetchExchangeRatesSettings();
+      setCnyRate(refreshed.cnyRate);
+      setUsdRate(refreshed.usdRate);
+      setInitialExchange(refreshed);
       showToast({ message: "환율 설정이 저장되었습니다.", variant: "success" });
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "환율 저장에 실패했습니다.";
@@ -82,34 +108,51 @@ export default function ExchangeRates() {
     }
   };
 
-  const onResetExchange = () => {
-    setCnyRate(initialSettings.cnyRate);
-    setUsdRate(initialSettings.usdRate);
-  };
-
-  const onSaveDuty = async () => {
-    setSavingDuty(true);
+  const onResetExchange = async () => {
+    setSavingExchange(true);
     try {
-      await updateDutySettings(currentSettings);
-      setInitialSettings(currentSettings);
-      showToast({ message: "관세 설정이 저장되었습니다.", variant: "success" });
+      const refreshed = await fetchExchangeRatesSettings();
+      setCnyRate(refreshed.cnyRate);
+      setUsdRate(refreshed.usdRate);
+      setInitialExchange(refreshed);
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "관세 저장에 실패했습니다.";
+      const msg = e instanceof ApiError ? e.message : "환율 설정을 불러오지 못했습니다.";
       showToast({ message: msg, variant: "error" });
     } finally {
-      setSavingDuty(false);
+      setSavingExchange(false);
     }
   };
 
-  const onResetDuty = () => {
-    setBasicDuty(initialSettings.basicDuty);
-    setVatDuty(initialSettings.vatDuty);
-    setSpecialDuty(initialSettings.specialDuty);
+  const onSaveAdditionalFx = async () => {
+    if (!currentAdditionalSettings.cnyAdditionalFxMargin || !currentAdditionalSettings.usdAdditionalFxMargin) {
+      showToast({ message: "추가환율(위안/달러)을 모두 입력하세요.", variant: "warning" });
+      return;
+    }
+    setSavingAdditional(true);
+    try {
+      await updateAdditionalFxSettings(currentAdditionalSettings);
+      const refreshed = await fetchAdditionalFxSettings();
+      setCnyAdditionalFx(refreshed.cnyAdditionalFxMargin);
+      setUsdAdditionalFx(refreshed.usdAdditionalFxMargin);
+      setInitialAdditionalFx(refreshed);
+      showToast({ message: "추가환율금액 설정이 저장되었습니다.", variant: "success" });
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.message : e instanceof Error ? e.message : "추가환율금액 저장에 실패했습니다.";
+      showToast({ message: msg, variant: "error" });
+    } finally {
+      setSavingAdditional(false);
+    }
+  };
+
+  const onResetAdditionalFx = () => {
+    setCnyAdditionalFx(initialAdditionalFx.cnyAdditionalFxMargin);
+    setUsdAdditionalFx(initialAdditionalFx.usdAdditionalFxMargin);
   };
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-bold text-gray-900">환율/관세 설정</h1>
+      <h1 className="text-lg font-bold text-gray-900">환율/추가환율금액 설정</h1>
       {loading ? (
         <div className="rounded-md border border-gray-200 bg-white p-6 text-sm text-gray-500">
           설정값을 불러오는 중...
@@ -119,15 +162,17 @@ export default function ExchangeRates() {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div className="rounded-md border border-gray-200 bg-white p-4">
           <p className="text-xs text-gray-500">현재 환율 (위안화)</p>
-          <p className="mt-2 text-2xl font-semibold text-cyan-600">₩1 = {cnyRate || "0"}¥</p>
+          <p className="mt-2 text-2xl font-semibold text-cyan-600"> ¥1 = {cnyRate || "0"}₩</p>
         </div>
         <div className="rounded-md border border-gray-200 bg-white p-4">
-          <p className="text-xs text-gray-500">기본 관세율</p>
-          <p className="mt-2 text-2xl font-semibold text-lime-600">{basicDuty || "0"}%</p>
+          <p className="text-xs text-gray-500">현재 환율 (달러)</p>
+          <p className="mt-2 text-2xl font-semibold text-lime-600">$1 = {usdRate || "0"}₩</p>
         </div>
         <div className="rounded-md border border-gray-200 bg-white p-4">
-          <p className="text-xs text-gray-500">부가세율</p>
-          <p className="mt-2 text-2xl font-semibold text-yellow-500">{vatDuty || "0"}%</p>
+          <p className="text-xs text-gray-500">추가환율금액 (위안/달러)</p>
+          <p className="mt-2 text-2xl font-semibold text-yellow-500">
+            ¥ {cnyAdditionalFx || "0"} / $ {usdAdditionalFx || "0"}
+          </p>
         </div>
       </div>
 
@@ -137,10 +182,10 @@ export default function ExchangeRates() {
         </div>
         <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-sky-800">
           <Info className="h-4 w-4" />
-          환율 및 관세 안내
+          환율 및 추가환율금액 안내
         </div>
         <p className="text-xs text-sky-900">
-          환율은 매일 자동으로 업데이트되며, 수동으로 조정할 수 있습니다. 관세율은 상품 카테고리별로 다르게 적용될 수 있습니다.
+          환율은 매일 자동으로 업데이트되며, 수동으로 조정할 수 있습니다. 추가환율금액도 통화별(CNY/USD)로 각각 설정할 수 있습니다.
         </p>
       </div>
 
@@ -151,13 +196,13 @@ export default function ExchangeRates() {
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-700">* 위안화 (CNY)</label>
               <div className="flex items-center rounded border border-gray-300 bg-white">
-                <span className="px-3 text-xs text-gray-500">₩1 =</span>
+                <span className="px-3 text-xs text-gray-500">¥1 =</span>
                 <input
                   value={cnyRate}
                   onChange={(e) => setCnyRate(e.target.value)}
                   className="h-9 flex-1 border-0 bg-transparent px-2 text-sm outline-none"
                 />
-                <span className="px-3 text-xs font-semibold text-gray-700">¥</span>
+                <span className="px-3 text-xs font-semibold text-gray-700">₩</span>
               </div>
             </div>
 
@@ -170,15 +215,15 @@ export default function ExchangeRates() {
                   onChange={(e) => setUsdRate(e.target.value)}
                   className="h-9 flex-1 border-0 bg-transparent px-2 text-sm outline-none"
                 />
-                <span className="px-3 text-xs font-semibold text-gray-700">$</span>
+                <span className="px-3 text-xs font-semibold text-gray-700">₩</span>
               </div>
             </div>
 
             <div className="flex justify-center gap-2 pt-1">
               <button
                 type="button"
-                onClick={onResetExchange}
-                disabled={savingExchange || savingDuty}
+                onClick={() => void onResetExchange()}
+                disabled={savingExchange || savingAdditional}
                 className="rounded border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
               >
                 초기화
@@ -186,7 +231,7 @@ export default function ExchangeRates() {
               <button
                 type="button"
                 onClick={() => void onSaveExchange()}
-                disabled={savingExchange || savingDuty}
+                disabled={savingExchange || savingAdditional}
                 className="rounded bg-cyan-500 px-4 py-2 text-xs font-semibold text-white hover:bg-cyan-600 disabled:opacity-60"
               >
                 {savingExchange ? "저장 중..." : "환율 저장"}
@@ -196,60 +241,49 @@ export default function ExchangeRates() {
         </section>
 
         <section className="rounded-md border border-gray-200 bg-white">
-          <div className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">관세 설정</div>
+          <div className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">추가환율금액 설정</div>
           <div className="space-y-4 px-4 py-4">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-700">* 기본 관세율</label>
+              <label className="mb-1 block text-xs font-semibold text-gray-700">* 위안화 (CNY)</label>
               <div className="flex items-center rounded border border-gray-300 bg-white">
+                <span className="px-3 text-xs text-gray-500">¥</span>
                 <input
-                  value={basicDuty}
-                  onChange={(e) => setBasicDuty(e.target.value)}
+                  value={cnyAdditionalFx}
+                  onChange={(e) => setCnyAdditionalFx(e.target.value)}
                   className="h-9 flex-1 border-0 bg-transparent px-3 text-sm outline-none"
                 />
-                <span className="px-3 text-xs font-semibold text-gray-700">%</span>
+                <span className="px-3 text-xs font-semibold text-gray-700">원</span>
               </div>
             </div>
-
             <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-700">* 부가세율 (VAT)</label>
+              <label className="mb-1 block text-xs font-semibold text-gray-700">* 달러 (USD)</label>
               <div className="flex items-center rounded border border-gray-300 bg-white">
+                <span className="px-3 text-xs text-gray-500">$</span>
                 <input
-                  value={vatDuty}
-                  onChange={(e) => setVatDuty(e.target.value)}
+                  value={usdAdditionalFx}
+                  onChange={(e) => setUsdAdditionalFx(e.target.value)}
                   className="h-9 flex-1 border-0 bg-transparent px-3 text-sm outline-none"
                 />
-                <span className="px-3 text-xs font-semibold text-gray-700">%</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-700">사치품 관세율</label>
-              <div className="flex items-center rounded border border-cyan-300 bg-white">
-                <input
-                  value={specialDuty}
-                  onChange={(e) => setSpecialDuty(e.target.value)}
-                  className="h-9 flex-1 border-0 bg-transparent px-3 text-sm outline-none"
-                />
-                <span className="px-3 text-xs font-semibold text-gray-700">%</span>
+                <span className="px-3 text-xs font-semibold text-gray-700">원</span>
               </div>
             </div>
 
             <div className="flex justify-center gap-2 pt-1">
               <button
                 type="button"
-                onClick={onResetDuty}
-                disabled={savingDuty || savingExchange}
+                onClick={onResetAdditionalFx}
+                disabled={savingAdditional || savingExchange}
                 className="rounded border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
               >
-                관세 설정 초기화
+                초기화
               </button>
               <button
                 type="button"
-                onClick={() => void onSaveDuty()}
-                disabled={savingDuty || savingExchange}
+                onClick={() => void onSaveAdditionalFx()}
+                disabled={savingAdditional || savingExchange}
                 className="rounded bg-cyan-500 px-4 py-2 text-xs font-semibold text-white hover:bg-cyan-600 disabled:opacity-60"
               >
-                {savingDuty ? "저장 중..." : "관세 설정 저장"}
+                {savingAdditional ? "저장 중..." : "추가환율금액 저장"}
               </button>
             </div>
           </div>

@@ -3,7 +3,7 @@ const ORDER_BOARD_MUTATION_SIGNAL_KEY = "obw_manual_order_mutation_signal";
 export type OrderBoardMutationSignal = {
   orderNo: string;
   at: number;
-  source: "purchase-cost" | "order-inquiry" | "order-board" | "additional-services";
+  source: "purchase-cost" | "order-inquiry" | "order-board" | "additional-services" | "inbound-scan";
 };
 
 /** Emit cross-tab signal so OrderBoard can refresh manualSearch rows immediately. */

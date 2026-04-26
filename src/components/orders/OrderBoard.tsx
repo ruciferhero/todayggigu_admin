@@ -66,6 +66,10 @@ export interface OrderBoardProduct {
   userMemo?: string;
   /** `GET/PATCH …/manual` 라인 `inspectionImages` — 실사검수 이미지 URL */
   inspectionImages?: string[];
+  /** `GET/PATCH …/manual` 라인 바코드 이미지 URL */
+  barcodeImages?: string[];
+  /** `GET/PATCH …/manual` 라인 이슈 사진 URL */
+  issueImages?: string[];
   /** `GET …/manual` 라인 `addservices` */
   additionalServices?: Array<{
     addServiceId: string;
@@ -90,6 +94,12 @@ export interface OrderBoardProduct {
     labelState: boolean;
     issueProduct: boolean;
   };
+  /** `GET …/manual/search`·PATCH 응답 `items[]`의 `incomeimgurl` / `issueimgurl` / `realbarcodeimgurl` 원본 */
+  inboundApiImages?: {
+    incomeimgurl: Array<{ url: string; isclick?: boolean }>;
+    issueimgurl: Array<{ url: string; isclick?: boolean }>;
+    realbarcodeimgurl: string;
+  };
 }
 
 export interface OrderBoardOrder {
@@ -98,7 +108,7 @@ export interface OrderBoardOrder {
   center: string;
   applicationType: string;
   customsClearance: string;
-  /** API `custommethod` — 통관방식. 없으면 테이블 통관란에 `customsClearance` 폴백 */
+  /** API `custommethod` — 통관방                                                                                                       식. 없으면 테이블 통관란에 `customsClearance` 폴백 */
   customsMethod?: string;
   typeLabel: string;
   shippingMethod: string;
@@ -1691,7 +1701,7 @@ export default function OrderBoard({
                                               "IMG"
                                             )}
                                           </div>
-                                          {p.inspectionImages && p.inspectionImages.length > 0 ? (
+                                          {/* {p.inspectionImages && p.inspectionImages.length > 0 ? (
                                             <div className="flex max-w-[5.5rem] flex-wrap justify-center gap-0.5">
                                               {p.inspectionImages.slice(0, 4).map((src) => (
                                                 <button
@@ -1705,7 +1715,7 @@ export default function OrderBoard({
                                                 </button>
                                               ))}
                                             </div>
-                                          ) : null}
+                                          ) : null} */}
                                           <button
                                             type="button"
                                             className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[10px] text-gray-800 hover:bg-gray-50"

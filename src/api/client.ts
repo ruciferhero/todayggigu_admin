@@ -84,6 +84,53 @@ export async function apiFetch<T = unknown>(
   return parsed as T;
 }
 
+/** `multipart/form-data` POST — `Content-Type`을 넣지 않아 boundary가 자동 설정됩니다. */
+export async function apiFetchMultipart<T = unknown>(
+  path: string,
+  formData: FormData,
+  { auth = true, method = "POST", ...init }: Omit<RequestInit, "body"> & { auth?: boolean } = {},
+): Promise<T> {
+  if (!BASE_URL) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not set");
+  }
+  const m = method || "POST";
+  const authHeaders = (token: string | null): HeadersInit => ({
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  });
+  const firstToken = auth ? getToken() : null;
+  let res = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    method: m,
+    headers: authHeaders(firstToken),
+    body: formData,
+  });
+  if (auth && (res.status === 401 || res.status === 403)) {
+    const refreshed = await refreshAccessTokenWithLock();
+    if (refreshed) {
+      res = await fetch(`${BASE_URL}${path}`, {
+        ...init,
+        method: m,
+        headers: authHeaders(refreshed),
+        body: formData,
+      });
+    } else {
+      setToken(null);
+    }
+  }
+  const text = await res.text();
+  const parsed = text ? safeJson(text) : null;
+  if (!res.ok) {
+    const message =
+      (isRecord(parsed) && typeof parsed.message === "string" && parsed.message) ||
+      (isRecord(parsed) && typeof parsed.error === "string" && parsed.error) ||
+      res.statusText ||
+      "Request failed";
+    throw new ApiError(res.status, message, parsed);
+  }
+  return parsed as T;
+}
+
 function buildHeaders(
   headers: HeadersInit | undefined,
   body: unknown,

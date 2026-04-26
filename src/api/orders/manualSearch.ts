@@ -1,13 +1,55 @@
-import { apiFetch } from "../client";
+import { ApiError, apiFetch, apiFetchMultipart } from "../client";
 import type { OrderBoardOrder, OrderBoardProduct } from "@/components/orders/OrderBoard";
 
 /** Prefix paths with `NEXT_PUBLIC_API_VERSION` (e.g. `v1`) → `/v1/orders/manual/...` */
 function apiPath(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
   const raw = (process.env.NEXT_PUBLIC_API_VERSION || "").trim();
   const v = raw.replace(/^\/+|\/+$/g, "");
-  const p = path.startsWith("/") ? path : `/${path}`;
+  const p = (path.startsWith("/") ? path : `/${path}`).replace(/\/{2,}/g, "/");
   if (!v) return p;
-  return `/${v}${p}`;
+  const norm = p.replace(/^\/+/, "");
+  const lowerNorm = norm.toLowerCase();
+  const lowerV = v.toLowerCase();
+  if (lowerNorm === lowerV || lowerNorm.startsWith(`${lowerV}/`)) return `/${norm}`;
+  return `/${v}/${norm}`;
+}
+
+function manualOrderDetailPaths(id: string): string[] {
+  const encoded = encodeURIComponent(id);
+  return [
+    apiPath(`/admin/orders/manual/${encoded}`),
+    apiPath(`/orders/manual/${encoded}`),
+  ];
+}
+
+async function apiFetchManualOrderDetailWith404Fallback<T>(
+  id: string,
+  options: { method: "GET" | "PATCH"; body?: Record<string, unknown> },
+): Promise<T> {
+  const paths = manualOrderDetailPaths(id);
+  let lastErr: unknown;
+  for (let i = 0; i < paths.length; i += 1) {
+    const path = paths[i];
+    try {
+      return await apiFetch<T>(path, {
+        method: options.method,
+        ...(options.body ? { body: options.body } : {}),
+      });
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      const canFallback = err.status === 404 && i < paths.length - 1;
+      if (!canFallback) throw err;
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error("Manual order request failed");
+}
+
+function formDataWithFiles(field: string, files: File[]): FormData {
+  const fd = new FormData();
+  for (const f of files) fd.append(field, f);
+  return fd;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -291,9 +333,38 @@ function readManualAdditionalServiceItems(row: Record<string, unknown>): Array<{
   return mapped;
 }
 
-/** `item.inspectionImages` — 문자열 URL 또는 `{ url }` 객체 배열. */
-function readInspectionImageUrls(it: Record<string, unknown>): string[] {
-  const raw = it.inspectionImages;
+/** `incomeimgurl` / `issueimgurl` API 원본 배열 → `{ url, isclick? }[]` */
+function normalizeInboundImgObjectList(raw: unknown): Array<{ url: string; isclick?: boolean }> {
+  if (!Array.isArray(raw)) return [];
+  const out: Array<{ url: string; isclick?: boolean }> = [];
+  for (const el of raw) {
+    if (typeof el === "string" && el.trim()) {
+      out.push({ url: el.trim(), isclick: false });
+      continue;
+    }
+    if (!isRecord(el)) continue;
+    const u = str(el.url || el.src || el.imageUrl).trim();
+    if (!u) continue;
+    const ic = el.isclick ?? el.isClick;
+    out.push({
+      url: u,
+      ...(typeof ic === "boolean" ? { isclick: ic } : {}),
+    });
+  }
+  return out;
+}
+
+function buildInboundApiImagesFromItem(it: Record<string, unknown>): OrderBoardProduct["inboundApiImages"] {
+  const incomeRaw = it.incomeimgurl ?? it.incomeImgUrl;
+  const issueRaw = it.issueimgurl ?? it.issueImgUrl;
+  const realBc = str(it.realbarcodeimgurl ?? it.realBarcodeImgurl ?? it.realBarcodeImgUrl ?? "").trim();
+  const incomeimgurl = normalizeInboundImgObjectList(incomeRaw);
+  const issueimgurl = normalizeInboundImgObjectList(issueRaw);
+  return { incomeimgurl, issueimgurl, realbarcodeimgurl: realBc };
+}
+
+/** 문자열 URL 또는 `{ url }` 형태의 이미지 배열에서 URL만 추출. */
+function urlsFromImgArrayField(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const out: string[] = [];
   for (const el of raw) {
@@ -307,6 +378,58 @@ function readInspectionImageUrls(it: Record<string, unknown>): string[] {
     }
   }
   return out;
+}
+
+/** `inspectionImages` / `incomeimgurl` — 실사·입고 이미지 URL. */
+function readInspectionImageUrls(it: Record<string, unknown>): string[] {
+  for (const k of ["inspectionImages", "incomeimgurl", "incomeImgUrl"] as const) {
+    const out = urlsFromImgArrayField(it[k]);
+    if (out.length) return out;
+  }
+  return [];
+}
+
+/** 바코드 이미지 URL — `barcodeimgurl`·`issueimgurl`(바코드 경로) 등. */
+function readBarcodeImageUrls(it: Record<string, unknown>): string[] {
+  for (const k of [
+    "barcodeimgurl",
+    "barcodeImgUrl",
+    "barcodeImages",
+    "barcodeImageUrls",
+    "barcodePhotos",
+    "barcodeimages",
+  ] as const) {
+    const out = urlsFromImgArrayField(it[k]);
+    if (out.length) return out;
+  }
+  const issueRaw = it.issueimgurl;
+  if (Array.isArray(issueRaw)) {
+    const fromIssue = urlsFromImgArrayField(issueRaw).filter(
+      (u) => /\/order\/barcode\//i.test(u) || /\/barcode\/images\//i.test(u),
+    );
+    if (fromIssue.length) return fromIssue;
+  }
+  const single = str(
+    it.barcodeImgUrl ||
+      it.barcodeImageUrl ||
+      it.barcodeimageurl ||
+      it.barcodePhoto ||
+      it.barcodephoto ||
+      (typeof it.barcodeImage === "string" ? it.barcodeImage : ""),
+  ).trim();
+  return single ? [single] : [];
+}
+
+/** 이슈 사진 URL — 전용 필드 및 `issueimgurl` 중 바코드 경로가 아닌 항목. */
+function readIssueImageUrls(it: Record<string, unknown>): string[] {
+  for (const k of ["issueImages", "issueimages", "issueImgUrls", "issuePhotoUrls"] as const) {
+    const out = urlsFromImgArrayField(it[k]);
+    if (out.length) return out;
+  }
+  const raw = it.issueimgurl ?? it.issueImgUrl;
+  return urlsFromImgArrayField(raw).filter(
+    (u) => !/\/order\/barcode\//i.test(u) && !/\/barcode\/images\//i.test(u),
+  );
 }
 
 /** `item.addservices` — 라인별 부가서비스 객체 목록 */
@@ -506,6 +629,9 @@ export function mapManualApiOrderToBoard(
     const q = num(it.quantity, 0);
     const lineTotal = typeof it.subtotal === "number" ? it.subtotal : unit * q;
     const inspectionImages = readInspectionImageUrls(line);
+    const barcodeImages = readBarcodeImageUrls(line);
+    const issueImages = readIssueImageUrls(line);
+    const inboundApiImages = buildInboundApiImagesFromItem(line);
     const additionalServices = readLineAdditionalServices(line);
     const sellerShip = num(it.sellershippingcost, NaN);
     const sellerShippingCost = Number.isFinite(sellerShip) ? sellerShip : undefined;
@@ -534,6 +660,9 @@ export function mapManualApiOrderToBoard(
       statusLabel: str(it.status || row.warehouseStatus, ""),
       image: img || undefined,
       inspectionImages: inspectionImages.length ? inspectionImages : undefined,
+      barcodeImages: barcodeImages.length ? barcodeImages : undefined,
+      issueImages: issueImages.length ? issueImages : undefined,
+      inboundApiImages,
       additionalServices: additionalServices.length ? additionalServices : undefined,
       productOrderNumber: str(it.productordernumber || it.productOrderNumber || "").trim() || undefined,
       productMemo: str(it.productMemo || it.productmemo || it.remarks),
@@ -661,8 +790,7 @@ export async function fetchManualOrder(
 ): Promise<OrderBoardOrder> {
   const id = manualOrderIdentifier.trim();
   if (!id) throw new Error("manualOrderIdentifier is required");
-  const path = apiPath(`/admin/orders/manual/${encodeURIComponent(id)}`);
-  const raw = await apiFetch<unknown>(path, { method: "GET" });
+  const raw = await apiFetchManualOrderDetailWith404Fallback<unknown>(id, { method: "GET" });
   if (!isRecord(raw)) throw new Error("Invalid API response");
   const data = raw.data;
   if (!isRecord(data)) throw new Error("Invalid API response: missing data");
@@ -706,10 +834,9 @@ export async function enrichWarehouseScanMatchesFromApi(
 /** `PATCH …/orders/manual/:id` — arbitrary JSON body (e.g. partial update). */
 export async function patchManualOrder(
   orderIdentifier: string,
-  body: Record<string, string | number | boolean>,
+  body: Record<string, unknown>,
 ): Promise<unknown> {
-  const path = apiPath(`/admin/orders/manual/${encodeURIComponent(orderIdentifier)}`);
-  return apiFetch<unknown>(path, { method: "PATCH", body });
+  return apiFetchManualOrderDetailWith404Fallback<unknown>(orderIdentifier, { method: "PATCH", body });
 }
 
 /**
@@ -729,8 +856,7 @@ export async function patchManualOrderAdditionalServices(
   },
 ): Promise<unknown> {
   const orderIdentifier = resolveManualOrderPatchIdentifier(order);
-  const path = apiPath(`/admin/orders/manual/${encodeURIComponent(orderIdentifier)}`);
-  return apiFetch<unknown>(path, {
+  return apiFetchManualOrderDetailWith404Fallback<unknown>(orderIdentifier, {
     method: "PATCH",
     body: {
       items: payload.items,
@@ -951,6 +1077,58 @@ export async function patchManualOrderLineRack(
   });
 }
 
+/** PATCH …/manual 라인 이미지 배열용 객체(`incomeimgurl`·`barcodeimgurl` 등). */
+function lineImageObjectsForPatch(urls: string[]): Array<{ url: string; isclick: boolean; id: string }> {
+  return urls.map((url) => ({
+    url,
+    // Postman 실응답/요청 포맷과 동일하게 `isclick: true`로 전송.
+    isclick: true,
+    id:
+      typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.randomUUID === "function"
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+  }));
+}
+
+/** 라인별 작업대기(`workPending`: `yes` / `no`) 갱신. */
+export async function patchManualOrderLineWorkPending(
+  order: Pick<OrderBoardOrder, "orderNo" | "manualOrderPatchId">,
+  product: Pick<OrderBoardProduct, "id" | "productNo">,
+  workPending: boolean,
+): Promise<unknown> {
+  const productNo = product.productNo.trim();
+  const lineId = product.id.trim();
+  const productId = productNo || lineId;
+  const yn = workPending ? "yes" : "no";
+  const baseFields = {
+    productid: productId,
+    partnumber: productNo || productId,
+    lineid: lineId,
+  };
+  const candidates: Array<Record<string, unknown>> = [
+    { ...baseFields, workPending: yn },
+    { ...baseFields, workpending: yn },
+    { ...baseFields, WorkPending: yn },
+  ];
+  let lastErr: unknown = null;
+  for (const payload of candidates) {
+    try {
+      return await patchManualOrder(resolveManualOrderPatchIdentifier(order), payload);
+    } catch (err) {
+      lastErr = err;
+      if (
+        err instanceof ApiError &&
+        (err.status === 400 || err.status === 404 || err.status === 405 || err.status === 422)
+      ) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (lastErr) throw lastErr;
+  throw new Error("Failed to update work pending");
+}
+
 /**
  * 라인 식별 + 메모 필드 PATCH.
  * Postman 스키마: `productMemo`, `userMemo`, `Caution`(대문자 C) + 라인 식별용 `productid`, `partnumber`.
@@ -1005,6 +1183,440 @@ export function patchManualOrderLineUserMemo(
   userMemo: string,
 ): Promise<unknown> {
   return patchManualOrderLineMemoPayload(order, product, { userMemo: userMemo.trim() });
+}
+
+/** 라인별 실사검수 이미지 URL 목록(`inspectionImages`) 갱신. */
+export async function patchManualOrderLineInspectionImages(
+  order: Pick<OrderBoardOrder, "orderNo" | "manualOrderPatchId">,
+  product: Pick<OrderBoardProduct, "id" | "productNo">,
+  inspectionImages: string[],
+): Promise<unknown> {
+  const productNo = product.productNo.trim();
+  const lineId = product.id.trim();
+  const productId = productNo || lineId;
+  const imageUrls = inspectionImages.map((u) => u.trim()).filter(Boolean);
+  const baseFields = {
+    productid: productId,
+    partnumber: productNo || productId,
+    lineid: lineId,
+  };
+  const imgObjs = lineImageObjectsForPatch(imageUrls);
+
+  const candidates: Array<Record<string, unknown>> = [
+    { ...baseFields, incomeimgurl: imgObjs },
+    { ...baseFields, incomeImgUrl: imgObjs },
+    { ...baseFields, inspectionImages: imageUrls },
+    { ...baseFields, inspectionimages: imageUrls },
+    { ...baseFields, inspectionImageUrls: imageUrls },
+    { ...baseFields, inspectionImages: JSON.stringify(imageUrls) },
+    { ...baseFields, inspectionimages: JSON.stringify(imageUrls) },
+    { ...baseFields, inspectionImageUrls: JSON.stringify(imageUrls) },
+    { ...baseFields, inspectionImageUrl: imageUrls[0] ?? "" },
+  ];
+
+  let lastErr: unknown = null;
+  for (const payload of candidates) {
+    try {
+      return await patchManualOrder(resolveManualOrderPatchIdentifier(order), payload);
+    } catch (err) {
+      lastErr = err;
+      if (
+        err instanceof ApiError &&
+        (err.status === 400 || err.status === 404 || err.status === 405 || err.status === 422)
+      ) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (lastErr) throw lastErr;
+  throw new Error("Failed to update inspection images");
+}
+
+export type OrderImageUploadCategory = "income" | "issue" | "barcode";
+
+const ORDER_IMAGE_UPLOAD_FORM_FIELD: Record<OrderImageUploadCategory, string> = {
+  income: "incomeimgurl",
+  issue: "issueimgurl",
+  barcode: "barcodeimgurl",
+};
+
+function stringsFromUnknownArray(arr: unknown): string[] {
+  if (!Array.isArray(arr)) return [];
+  return (arr as unknown[])
+    .filter((x): x is string => typeof x === "string" && x.trim() !== "")
+    .map((s) => s.trim());
+}
+
+function stringsFromUnknownArrayOrObjectUrls(arr: unknown): string[] {
+  if (!Array.isArray(arr)) return [];
+  const out: string[] = [];
+  for (const raw of arr as unknown[]) {
+    if (typeof raw === "string" && raw.trim()) {
+      out.push(raw.trim());
+      continue;
+    }
+    if (!isRecord(raw)) continue;
+    const u = raw.url ?? raw.fileUrl ?? raw.path ?? raw.src ?? raw.location;
+    if (typeof u === "string" && u.trim()) out.push(u.trim());
+  }
+  return out;
+}
+
+function stringsFromImageField(raw: unknown): string[] {
+  if (typeof raw === "string" && raw.trim()) return [raw.trim()];
+  if (Array.isArray(raw)) {
+    const mixed = stringsFromUnknownArrayOrObjectUrls(raw);
+    if (mixed.length) return mixed;
+  }
+  return urlsFromImgArrayField(raw);
+}
+
+/** `POST …/upload-images` 응답에서 업로드된 공개 URL 목록 추출 (백엔드별 페이로드 차이 흡수). */
+function parseOrderUploadImagesResponse(raw: unknown, category: OrderImageUploadCategory): string[] {
+  const root =
+    isRecord(raw) && isRecord(raw.data)
+      ? (raw.data as Record<string, unknown>)
+      : isRecord(raw)
+        ? raw
+        : null;
+  if (!root) return [];
+
+  const grouped = isRecord(root.groupedUrls) ? root.groupedUrls : null;
+  if (grouped) {
+    const primary = stringsFromImageField(grouped[category]);
+    if (primary.length) return primary;
+    const altKeys: Record<OrderImageUploadCategory, string[]> = {
+      income: ["income", "incomeimgurl", "incomeImgUrl", "incomeUrls"],
+      issue: ["issue", "issueimgurl", "issueImgUrl", "issueUrls"],
+      barcode: ["barcode", "barcodeimgurl", "barcodeImgUrl", "barcodeUrls"],
+    };
+    for (const k of altKeys[category]) {
+      const u = stringsFromImageField(grouped[k]);
+      if (u.length) return u;
+    }
+  }
+
+  const groupedFiles = isRecord(root.groupedFiles) ? root.groupedFiles : null;
+  if (groupedFiles) {
+    const directGroupedFiles = stringsFromImageField(groupedFiles[category]);
+    if (directGroupedFiles.length) return directGroupedFiles;
+    const keyMap: Record<OrderImageUploadCategory, string[]> = {
+      income: ["income", "incomeimgurl", "incomeImgUrl"],
+      issue: ["issue", "issueimgurl", "issueImgUrl"],
+      barcode: ["barcode", "barcodeimgurl", "barcodeImgUrl"],
+    };
+    for (const k of keyMap[category]) {
+      const u = stringsFromImageField(groupedFiles[k]);
+      if (u.length) return u;
+    }
+  }
+
+  if (Array.isArray(root.urls)) {
+    const u = stringsFromUnknownArrayOrObjectUrls(root.urls);
+    if (u.length) return u;
+  }
+  if (Array.isArray(root.images)) {
+    const u = stringsFromUnknownArrayOrObjectUrls(root.images);
+    if (u.length) return u;
+  }
+
+  const formField = ORDER_IMAGE_UPLOAD_FORM_FIELD[category];
+  const direct = root[formField];
+  if (typeof direct === "string" && direct.trim()) return [direct.trim()];
+  if (Array.isArray(direct)) {
+    const u = stringsFromUnknownArrayOrObjectUrls(direct);
+    if (u.length) return u;
+  }
+
+  for (const key of ["url", "fileUrl", "path"] as const) {
+    const v = root[key];
+    if (typeof v === "string" && v.trim()) return [v.trim()];
+  }
+  if (isRecord(root.file)) {
+    for (const key of ["url", "fileUrl", "path"] as const) {
+      const v = root.file[key];
+      if (typeof v === "string" && v.trim()) return [v.trim()];
+    }
+  }
+
+  if (Array.isArray(root.files)) {
+    const fromFiles = stringsFromUnknownArrayOrObjectUrls(root.files);
+    if (fromFiles.length) return fromFiles;
+  }
+
+  const order = isRecord(root.order) ? root.order : null;
+  if (order && Array.isArray(order.items)) {
+    const itemFieldByCategory: Record<OrderImageUploadCategory, string> = {
+      income: "incomeimgurl",
+      issue: "issueimgurl",
+      barcode: "barcodeimgurl",
+    };
+    const key = itemFieldByCategory[category];
+    const fromItems: string[] = [];
+    for (const it of order.items) {
+      if (!isRecord(it)) continue;
+      const urls = stringsFromImageField(it[key]);
+      if (urls.length) fromItems.push(...urls);
+    }
+    if (fromItems.length) return Array.from(new Set(fromItems));
+  }
+
+  return [];
+}
+
+/**
+ * `POST …/admin/orders/upload-images` — form 필드 `incomeimgurl` / `issueimgurl` / `barcodeimgurl`.
+ * 응답 `data.groupedUrls.<category>`에서 업로드된 파일 URL 목록을 반환.
+ */
+export async function postAdminOrderUploadImages(
+  category: OrderImageUploadCategory,
+  files: File[],
+): Promise<string[]> {
+  if (!files.length) return [];
+  const defaultField = ORDER_IMAGE_UPLOAD_FORM_FIELD[category];
+  const raw = await apiFetchMultipart<unknown>(
+    apiPath("/admin/orders/upload-images"),
+    formDataWithFiles(defaultField, files),
+    { method: "POST" },
+  );
+  return parseOrderUploadImagesResponse(raw, category);
+}
+
+/** `POST …/admin/orders/upload-images` 응답 `data.groupedUrls` — 입고스캔 PATCH용. */
+export type GroupedInboundUploadUrls = { income: string[]; issue: string[]; barcode: string[] };
+
+export function parseGroupedInboundUrlsFromUploadResponse(raw: unknown): GroupedInboundUploadUrls {
+  const empty: GroupedInboundUploadUrls = { income: [], issue: [], barcode: [] };
+  if (!isRecord(raw)) return empty;
+  const data = isRecord(raw.data) ? raw.data : raw;
+  const grouped = isRecord(data.groupedUrls) ? data.groupedUrls : null;
+  if (grouped) {
+    return {
+      income: stringsFromImageField(grouped.income ?? grouped.incomeimgurl ?? grouped.incomeImgUrl),
+      issue: stringsFromImageField(grouped.issue ?? grouped.issueimgurl ?? grouped.issueImgUrl),
+      barcode: stringsFromImageField(grouped.barcode ?? grouped.barcodeimgurl ?? grouped.barcodeImgUrl),
+    };
+  }
+  if (Array.isArray(data.files)) {
+    const income: string[] = [];
+    const issue: string[] = [];
+    const barcode: string[] = [];
+    for (const f of data.files as unknown[]) {
+      if (!isRecord(f)) continue;
+      const u = str(f.url).trim();
+      if (!u) continue;
+      const k = str(f.kind).toLowerCase();
+      if (k === "income") income.push(u);
+      else if (k === "issue") issue.push(u);
+      else if (k === "barcode") barcode.push(u);
+    }
+    if (income.length || issue.length || barcode.length) return { income, issue, barcode };
+  }
+  const flat = stringsFromImageField(data.urls);
+  if (flat.length) return { income: flat, issue: [], barcode: [] };
+  return empty;
+}
+
+/**
+ * 입고스캔: 한 번에 파일 업로드 후 `groupedUrls` 파싱.
+ * multipart는 각 파일을 `incomeimgurl` 필드로 전송(백엔드가 `kind: mixed`로 분류).
+ */
+export async function postAdminOrderUploadImagesMixed(files: File[]): Promise<GroupedInboundUploadUrls> {
+  if (!files.length) return { income: [], issue: [], barcode: [] };
+  const fd = new FormData();
+  for (const f of files) fd.append("incomeimgurl", f);
+  const raw = await apiFetchMultipart<unknown>(apiPath("/admin/orders/upload-images"), fd, { method: "POST" });
+  return parseGroupedInboundUrlsFromUploadResponse(raw);
+}
+
+function inboundPatchUrlObjects(urls: string[]): Array<{ url: string; isclick: boolean }> {
+  return urls.map((url) => ({ url: url.trim(), isclick: true })).filter((x) => x.url);
+}
+
+/**
+ * PATCH `…/admin/orders/manual/:id` — 본문 `items: [{ offerId, incomeimgurl, issueimgurl, realbarcodeimgurl, … }]`
+ * (백엔드 계약: 업로드 URL을 라인에 저장)
+ */
+function mergeUniqueStringUrls(existing: string[], added: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const u of [...existing, ...added]) {
+    const s = u.trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+}
+
+export async function patchManualOrderInboundLineFromUpload(
+  order: Pick<OrderBoardOrder, "orderNo" | "manualOrderPatchId">,
+  product: OrderBoardProduct,
+  grouped: GroupedInboundUploadUrls,
+): Promise<unknown> {
+  const offerId = str(product.productNo || product.id).trim();
+  if (!offerId) throw new Error("offerId (productNo) is required for inbound PATCH");
+  const prevInc = product.inboundApiImages?.incomeimgurl?.map((x) => x.url) ?? [];
+  const prevIss = product.inboundApiImages?.issueimgurl?.map((x) => x.url) ?? [];
+  const prevBc = str(product.inboundApiImages?.realbarcodeimgurl ?? "").trim();
+  const incomeUrls = mergeUniqueStringUrls(prevInc, grouped.income);
+  const issueUrls = mergeUniqueStringUrls(prevIss, grouped.issue);
+  // 바코드 업로드가 들어오면 기존값을 유지하지 말고 새 URL로 교체한다.
+  const barcodeUrls = grouped.barcode.length
+    ? mergeUniqueStringUrls([], grouped.barcode)
+    : mergeUniqueStringUrls(prevBc ? [prevBc] : [], []);
+  const body: Record<string, unknown> = {
+    items: [
+      {
+        offerId,
+        trackingNumber: str(product.trackingNo || "").trim(),
+        productordernumber: str(product.productOrderNumber || "").trim(),
+        sellershippingcost: String(
+          product.sellerShippingCost != null && Number.isFinite(product.sellerShippingCost)
+            ? Math.round(product.sellerShippingCost)
+            : "",
+        ),
+        incomeimgurl: inboundPatchUrlObjects(incomeUrls),
+        issueimgurl: inboundPatchUrlObjects(issueUrls),
+        realbarcodeimgurl: barcodeUrls[0] ?? "",
+      },
+    ],
+  };
+  return patchManualOrder(resolveManualOrderPatchIdentifier(order), body);
+}
+
+/** `GET …/admin/orders/manual/search?orderNumber=…` 결과로 입고스캔 `matches`의 해당 주문 줄 이미지 필드 갱신 */
+export async function refreshMatchesInboundFromManualSearch(
+  matches: WarehouseScanMatchPair[],
+  orderNumber: string,
+  translate: (key: string) => string,
+): Promise<WarehouseScanMatchPair[]> {
+  const on = orderNumber.trim();
+  if (!on || matches.length === 0) return matches;
+  const res = await fetchManualOrdersSearch({ orderNumber: on, page: 1, pageSize: 20 }, translate);
+  const freshOrder = res.orders.find((o) => o.orderNo === on);
+  if (!freshOrder) return matches;
+  return matches.map((m) => {
+    if (m.order.orderNo !== on) return m;
+    const fp = freshOrder.products.find((p) => p.id === m.product.id || p.productNo === m.product.productNo);
+    if (!fp) return m;
+    return {
+      order: {
+        ...m.order,
+        manualOrderPatchId: freshOrder.manualOrderPatchId || m.order.manualOrderPatchId,
+      },
+      product: {
+        ...m.product,
+        inboundApiImages: fp.inboundApiImages,
+        inspectionImages: fp.inspectionImages,
+        barcodeImages: fp.barcodeImages,
+        issueImages: fp.issueImages,
+        manualStatusTags: fp.manualStatusTags ?? m.product.manualStatusTags,
+      },
+    };
+  });
+}
+
+/** 라인별 바코드 이미지 URL 목록 갱신. */
+export async function patchManualOrderLineBarcodeImages(
+  order: Pick<OrderBoardOrder, "orderNo" | "manualOrderPatchId">,
+  product: Pick<OrderBoardProduct, "id" | "productNo">,
+  barcodeImages: string[],
+): Promise<unknown> {
+  const productNo = product.productNo.trim();
+  const lineId = product.id.trim();
+  const productId = productNo || lineId;
+  const imageUrls = barcodeImages.map((u) => u.trim()).filter(Boolean);
+  const baseFields = {
+    productid: productId,
+    partnumber: productNo || productId,
+    lineid: lineId,
+  };
+  const imgObjs = lineImageObjectsForPatch(imageUrls);
+
+  const candidates: Array<Record<string, unknown>> = [
+    { ...baseFields, barcodeImgUrl: imageUrls[0] ?? "" },
+    { ...baseFields, barcodeimgurl: imageUrls[0] ?? "" },
+    { ...baseFields, barcodeImageUrl: imageUrls[0] ?? "" },
+    { ...baseFields, barcodeimgurl: imgObjs },
+    { ...baseFields, barcodeImgUrl: imgObjs },
+    { ...baseFields, issueimgurl: imgObjs },
+    { ...baseFields, barcodeimgurl: imageUrls },
+    { ...baseFields, issueimgurl: imageUrls },
+    { ...baseFields, barcodeImages: imageUrls },
+    { ...baseFields, barcodeimages: imageUrls },
+    { ...baseFields, barcodeImageUrls: imageUrls },
+    { ...baseFields, barcodePhotos: imageUrls },
+    { ...baseFields, barcodeImages: JSON.stringify(imageUrls) },
+    { ...baseFields, barcodeimages: JSON.stringify(imageUrls) },
+    { ...baseFields, barcodeImageUrls: JSON.stringify(imageUrls) },
+    { ...baseFields, barcodeImageUrl: imageUrls[0] ?? "" },
+  ];
+
+  let lastErr: unknown = null;
+  for (const payload of candidates) {
+    try {
+      return await patchManualOrder(resolveManualOrderPatchIdentifier(order), payload);
+    } catch (err) {
+      lastErr = err;
+      if (
+        err instanceof ApiError &&
+        (err.status === 400 || err.status === 404 || err.status === 405 || err.status === 422)
+      ) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (lastErr) throw lastErr;
+  throw new Error("Failed to update barcode images");
+}
+
+/** 라인별 이슈 사진 URL 목록(`issueimgurl` 등) 갱신. */
+export async function patchManualOrderLineIssueImages(
+  order: Pick<OrderBoardOrder, "orderNo" | "manualOrderPatchId">,
+  product: Pick<OrderBoardProduct, "id" | "productNo">,
+  issueImages: string[],
+): Promise<unknown> {
+  const productNo = product.productNo.trim();
+  const lineId = product.id.trim();
+  const productId = productNo || lineId;
+  const imageUrls = issueImages.map((u) => u.trim()).filter(Boolean);
+  const baseFields = {
+    productid: productId,
+    partnumber: productNo || productId,
+    lineid: lineId,
+  };
+  const imgObjs = lineImageObjectsForPatch(imageUrls);
+
+  const candidates: Array<Record<string, unknown>> = [
+    { ...baseFields, issueimgurl: imgObjs },
+    { ...baseFields, issueImgUrl: imgObjs },
+    { ...baseFields, issueImages: imageUrls },
+    { ...baseFields, issueimages: imageUrls },
+    { ...baseFields, issueImages: JSON.stringify(imageUrls) },
+    { ...baseFields, issueimages: JSON.stringify(imageUrls) },
+    { ...baseFields, issueImageUrl: imageUrls[0] ?? "" },
+  ];
+
+  let lastErr: unknown = null;
+  for (const payload of candidates) {
+    try {
+      return await patchManualOrder(resolveManualOrderPatchIdentifier(order), payload);
+    } catch (err) {
+      lastErr = err;
+      if (
+        err instanceof ApiError &&
+        (err.status === 400 || err.status === 404 || err.status === 405 || err.status === 422)
+      ) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (lastErr) throw lastErr;
+  throw new Error("Failed to update issue images");
 }
 
 /**
